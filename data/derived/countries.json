@@ -1,0 +1,6 @@
+{
+ "status": "TODO",
+ "method": "artiste -> pays d'origine via MusicBrainz (variable calculée)",
+ "n_artists_a_enrichir": 10692,
+ "by_country": []
+}

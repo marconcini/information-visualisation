@@ -1,0 +1,32 @@
+# --- Fichiers système ---
+.DS_Store
+Thumbs.db
+
+# --- Éditeurs / IDE ---
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- Node (au cas où quelqu'un installe des paquets) ---
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# --- Python (si les scripts de transformation sont en Python) ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.venv/
+
+# --- Logs / temporaires ---
+*.log
+tmp/
+
+# --- Données ---
+# Le dataset brut et les datasets dérivés sont versionnés par défaut
+# pour que la démo tourne après un simple "git clone".
+# Pour alléger le dépôt, décommenter au besoin :
+# data/raw/spotify_songs.csv
+# data/derived/

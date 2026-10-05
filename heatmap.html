@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Heatmap de corrélation — Spotify</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #1e2126;
+      background: #f4f5f7;
+    }
+    header {
+      padding: 18px 24px;
+      background: #fff;
+      border-bottom: 1px solid #e2e4e8;
+    }
+    header h1 { margin: 0; font-size: 1.3rem; }
+    header p  { margin: 4px 0 0; color: #5a5f66; font-size: .9rem; }
+    main { padding: 24px; }
+    #heatmap svg { max-width: 760px; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Heatmap de corrélation</h1>
+    <p>Quelles caractéristiques audio vont ensemble ? (corrélation de Pearson)</p>
+  </header>
+
+  <main>
+    <div id="heatmap"></div>
+  </main>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="js/DataLoader.js"></script>
+  <script src="js/heatmap/heatmap.js"></script>
+</body>
+</html>

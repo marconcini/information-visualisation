@@ -20,6 +20,19 @@
     header p  { margin: 4px 0 0; color: #5a5f66; font-size: .9rem; }
     main { padding: 24px; }
     #heatmap svg { max-width: 760px; width: 100%; height: auto; }
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      display: none;
+      background: #fff;
+      border: 1px solid #e2e4e8;
+      border-radius: 6px;
+      padding: 6px 9px;
+      font-size: 12px;
+      color: #1e2126;
+      box-shadow: 0 4px 14px rgba(0,0,0,.12);
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
@@ -31,6 +44,8 @@
   <main>
     <div id="heatmap"></div>
   </main>
+
+  <div id="tip" class="tooltip"></div>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="js/DataLoader.js"></script>

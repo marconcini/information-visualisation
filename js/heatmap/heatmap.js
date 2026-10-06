@@ -50,12 +50,29 @@ function drawHeatmap(data) {
     }
   }
 
+  const tip = d3.select("#tip");
+
   // Groupe par cellule (case + valeur)
   const cell = svg.append("g")
     .selectAll("g")
     .data(cells)
     .join("g")
-    .attr("transform", d => `translate(${x(d.j)}, ${y(d.i)})`);
+    .attr("transform", d => `translate(${x(d.j)}, ${y(d.i)})`)
+    .style("cursor", "pointer")
+    // Survol : contour de la case + infobulle (details-on-demand)
+    .on("mouseover", function (event, d) {
+      d3.select(this).select("rect").attr("stroke", "#1e2126").attr("stroke-width", 2);
+      tip.style("display", "block")
+        .html(`<b>${labels[features[d.i]]} × ${labels[features[d.j]]}</b><br>r = ${d.v.toFixed(2)}`);
+    })
+    .on("mousemove", function (event) {
+      tip.style("left", (event.pageX + 12) + "px")
+         .style("top", (event.pageY + 12) + "px");
+    })
+    .on("mouseout", function () {
+      d3.select(this).select("rect").attr("stroke", null);
+      tip.style("display", "none");
+    });
 
   // La case colorée
   cell.append("rect")

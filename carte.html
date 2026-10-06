@@ -18,6 +18,18 @@
       font-size: .9rem; color: #5a4a2e; max-width: 760px;
     }
     .caveat b { color: #3d3115; }
+    .detail {
+      max-width: 760px; margin: 14px 0 0; min-height: 1px;
+    }
+    .detail .card {
+      background: #fff; border: 1px solid #e2e4e8; border-left: 4px solid #2f6fb0;
+      border-radius: 12px; padding: 14px 16px;
+    }
+    .detail h3 { margin: 0 0 10px; font-size: 1.05rem; }
+    .detail .stats { display: flex; flex-wrap: wrap; gap: 10px 26px; }
+    .detail .stats div { font-size: .85rem; color: #5a5f66; display: flex; flex-direction: column; }
+    .detail .stats span { font-size: 1.4rem; font-weight: 600; color: #1e2126; }
+    .detail .muted { color: #8b8e95; font-size: .9rem; }
     .toolbar { margin-bottom: 12px; font-size: .9rem; color: #5a5f66; }
     .toolbar select {
       font-size: .9rem; padding: 5px 8px; border: 1px solid #e2e4e8;
@@ -54,6 +66,7 @@
     </div>
     <p id="coverage" class="note"></p>
     <div id="map"></div>
+    <div id="detail" class="detail"><p class="muted">Clique sur un pays pour voir son détail.</p></div>
   </main>
 
   <div id="tip" class="tooltip"></div>

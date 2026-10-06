@@ -1,6 +1,293 @@
 {
- "status": "TODO",
- "method": "artiste -> pays d'origine via MusicBrainz (variable calculée)",
- "n_artists_a_enrichir": 10692,
- "by_country": []
+ "method": "artiste -> pays via MusicBrainz (champ 'country' de l'artiste/du groupe)",
+ "definition": "Pays d'ORIGINE de l'artiste tel que renseigne dans MusicBrainz (pays du groupe pour un groupe). Ce n'est pas le pays d'ecoute.",
+ "coverage": {
+  "artists_enriched": 698,
+  "artists_queried": 800,
+  "tracks_covered": 10650,
+  "tracks_total": 28356,
+  "pct_tracks": 37.6
+ },
+ "by_country": [
+  {
+   "code": "USA",
+   "name": "United States of America",
+   "tracks": 5463,
+   "artists": 363,
+   "avg_popularity": 41.2
+  },
+  {
+   "code": "GBR",
+   "name": "United Kingdom of Great Britain and Northern Ireland",
+   "tracks": 1352,
+   "artists": 92,
+   "avg_popularity": 43.6
+  },
+  {
+   "code": "NLD",
+   "name": "Netherlands, Kingdom of the",
+   "tracks": 798,
+   "artists": 39,
+   "avg_popularity": 32.1
+  },
+  {
+   "code": "PRI",
+   "name": "Puerto Rico",
+   "tracks": 577,
+   "artists": 32,
+   "avg_popularity": 47.8
+  },
+  {
+   "code": "CAN",
+   "name": "Canada",
+   "tracks": 337,
+   "artists": 20,
+   "avg_popularity": 45.9
+  },
+  {
+   "code": "DEU",
+   "name": "Germany",
+   "tracks": 254,
+   "artists": 18,
+   "avg_popularity": 37.7
+  },
+  {
+   "code": "SWE",
+   "name": "Sweden",
+   "tracks": 210,
+   "artists": 14,
+   "avg_popularity": 40.7
+  },
+  {
+   "code": "COL",
+   "name": "Colombia",
+   "tracks": 194,
+   "artists": 15,
+   "avg_popularity": 49.5
+  },
+  {
+   "code": "FRA",
+   "name": "France",
+   "tracks": 170,
+   "artists": 8,
+   "avg_popularity": 47.4
+  },
+  {
+   "code": "MEX",
+   "name": "Mexico",
+   "tracks": 126,
+   "artists": 10,
+   "avg_popularity": 43.5
+  },
+  {
+   "code": "AUS",
+   "name": "Australia",
+   "tracks": 123,
+   "artists": 11,
+   "avg_popularity": 53.1
+  },
+  {
+   "code": "ARG",
+   "name": "Argentina",
+   "tracks": 117,
+   "artists": 8,
+   "avg_popularity": 38.4
+  },
+  {
+   "code": "BEL",
+   "name": "Belgium",
+   "tracks": 114,
+   "artists": 5,
+   "avg_popularity": 38.5
+  },
+  {
+   "code": "NOR",
+   "name": "Norway",
+   "tracks": 103,
+   "artists": 6,
+   "avg_popularity": 50.5
+  },
+  {
+   "code": "ESP",
+   "name": "Spain",
+   "tracks": 88,
+   "artists": 7,
+   "avg_popularity": 33.8
+  },
+  {
+   "code": "JPN",
+   "name": "Japan",
+   "tracks": 87,
+   "artists": 4,
+   "avg_popularity": 20.7
+  },
+  {
+   "code": "IRL",
+   "name": "Ireland",
+   "tracks": 82,
+   "artists": 3,
+   "avg_popularity": 39.4
+  },
+  {
+   "code": "JAM",
+   "name": "Jamaica",
+   "tracks": 71,
+   "artists": 3,
+   "avg_popularity": 34.8
+  },
+  {
+   "code": "DNK",
+   "name": "Denmark",
+   "tracks": 43,
+   "artists": 5,
+   "avg_popularity": 44.8
+  },
+  {
+   "code": "CHL",
+   "name": "Chile",
+   "tracks": 43,
+   "artists": 1,
+   "avg_popularity": 8.0
+  },
+  {
+   "code": "KOR",
+   "name": "Korea, Republic of",
+   "tracks": 40,
+   "artists": 4,
+   "avg_popularity": 44.6
+  },
+  {
+   "code": "BRA",
+   "name": "Brazil",
+   "tracks": 27,
+   "artists": 3,
+   "avg_popularity": 60.1
+  },
+  {
+   "code": "DOM",
+   "name": "Dominican Republic",
+   "tracks": 26,
+   "artists": 3,
+   "avg_popularity": 52.7
+  },
+  {
+   "code": "ITA",
+   "name": "Italy",
+   "tracks": 24,
+   "artists": 3,
+   "avg_popularity": 50.5
+  },
+  {
+   "code": "POL",
+   "name": "Poland",
+   "tracks": 20,
+   "artists": 3,
+   "avg_popularity": 52.4
+  },
+  {
+   "code": "EST",
+   "name": "Estonia",
+   "tracks": 18,
+   "artists": 2,
+   "avg_popularity": 36.9
+  },
+  {
+   "code": "VEN",
+   "name": "Venezuela, Bolivarian Republic of",
+   "tracks": 17,
+   "artists": 2,
+   "avg_popularity": 41.9
+  },
+  {
+   "code": "PAN",
+   "name": "Panama",
+   "tracks": 16,
+   "artists": 2,
+   "avg_popularity": 47.5
+  },
+  {
+   "code": "IND",
+   "name": "India",
+   "tracks": 15,
+   "artists": 1,
+   "avg_popularity": 53.9
+  },
+  {
+   "code": "SEN",
+   "name": "Senegal",
+   "tracks": 12,
+   "artists": 1,
+   "avg_popularity": 43.3
+  },
+  {
+   "code": "AUT",
+   "name": "Austria",
+   "tracks": 10,
+   "artists": 1,
+   "avg_popularity": 49.2
+  },
+  {
+   "code": "LTU",
+   "name": "Lithuania",
+   "tracks": 9,
+   "artists": 1,
+   "avg_popularity": 48.9
+  },
+  {
+   "code": "ISL",
+   "name": "Iceland",
+   "tracks": 9,
+   "artists": 1,
+   "avg_popularity": 22.3
+  },
+  {
+   "code": "PHL",
+   "name": "Philippines",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 24.9
+  },
+  {
+   "code": "HRV",
+   "name": "Croatia",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 36.0
+  },
+  {
+   "code": "CUB",
+   "name": "Cuba",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 40.0
+  },
+  {
+   "code": "RUS",
+   "name": "Russian Federation",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 38.5
+  },
+  {
+   "code": "CHE",
+   "name": "Switzerland",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 43.1
+  },
+  {
+   "code": "TUR",
+   "name": "Türkiye",
+   "tracks": 8,
+   "artists": 1,
+   "avg_popularity": 40.5
+  },
+  {
+   "code": "NGA",
+   "name": "Nigeria",
+   "tracks": 7,
+   "artists": 1,
+   "avg_popularity": 62.3
+  }
+ ]
 }

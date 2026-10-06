@@ -7,13 +7,19 @@
 // Dimensions d'une cellule et marges (place pour les labels)
 const CELL = 46;
 const MARGIN = { top: 96, right: 20, bottom: 20, left: 96 };
+const LEGEND_H = 60; // espace sous la matrice pour la légende
 
 // Échelle de couleur divergente : bleu (négatif) ↔ gris (0) ↔ rouge (positif)
 const color = d3.scaleLinear()
   .domain([-1, 0, 1])
-  .range(["#2a78d6", "#eeece7", "#e34948"])
+  .range(["#2a78d6", "#eeece7", "#e34848"])
   .interpolate(d3.interpolateRgb)
   .clamp(true);
+
+// Couleur de texte lisible selon le fond de la cellule
+function textColor(v) {
+  return d3.hsl(color(v)).l < 0.55 ? "#ffffff" : "#1e2126";
+}
 
 // Chargement des données puis dessin
 DataLoader.correlation().then(drawHeatmap);
@@ -25,7 +31,7 @@ function drawHeatmap(data) {
   const n = features.length;
 
   const width = MARGIN.left + CELL * n + MARGIN.right;
-  const height = MARGIN.top + CELL * n + MARGIN.bottom;
+  const height = MARGIN.top + CELL * n + MARGIN.bottom + LEGEND_H;
 
   const svg = d3.select("#heatmap")
     .append("svg")
@@ -44,17 +50,29 @@ function drawHeatmap(data) {
     }
   }
 
-  // Les cases colorées
-  svg.append("g")
-    .selectAll("rect")
+  // Groupe par cellule (case + valeur)
+  const cell = svg.append("g")
+    .selectAll("g")
     .data(cells)
-    .join("rect")
-    .attr("x", d => x(d.j))
-    .attr("y", d => y(d.i))
+    .join("g")
+    .attr("transform", d => `translate(${x(d.j)}, ${y(d.i)})`);
+
+  // La case colorée
+  cell.append("rect")
     .attr("width", x.bandwidth() - 2)
     .attr("height", y.bandwidth() - 2)
     .attr("rx", 3)
     .attr("fill", d => color(d.v));
+
+  // La valeur de corrélation dans la case
+  cell.append("text")
+    .attr("x", (x.bandwidth() - 2) / 2)
+    .attr("y", (y.bandwidth() - 2) / 2)
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle")
+    .attr("font-size", 10)
+    .attr("fill", d => textColor(d.v))
+    .text(d => d.v.toFixed(2));
 
   // Labels des lignes (à gauche)
   svg.append("g")
@@ -80,8 +98,45 @@ function drawHeatmap(data) {
     .attr("fill", "#5a5f66")
     .text(j => labels[features[j]]);
 
+  drawLegend(svg, width, MARGIN.top + CELL * n + 40);
+}
+
+// Légende : barre dégradée bleu ↔ gris ↔ rouge, de -1 à +1
+function drawLegend(svg, width, yPos) {
+  const barW = 220, barH = 12;
+  const x0 = (width - barW) / 2;
+
+  // Dégradé
+  const defs = svg.append("defs");
+  const grad = defs.append("linearGradient").attr("id", "corr-gradient");
+  [[0, -1], [0.5, 0], [1, 1]].forEach(([offset, v]) => {
+    grad.append("stop").attr("offset", `${offset * 100}%`).attr("stop-color", color(v));
+  });
+
+  const g = svg.append("g");
+  g.append("rect")
+    .attr("x", x0).attr("y", yPos)
+    .attr("width", barW).attr("height", barH)
+    .attr("rx", 3)
+    .attr("fill", "url(#corr-gradient)")
+    .attr("stroke", "#e2e4e8");
+
+  // Graduations
+  [["-1", x0], ["0", x0 + barW / 2], ["+1", x0 + barW]].forEach(([t, px]) => {
+    g.append("text")
+      .attr("x", px).attr("y", yPos + barH + 14)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 10).attr("fill", "#5a5f66")
+      .text(t);
+  });
+
+  g.append("text")
+    .attr("x", width / 2).attr("y", yPos - 8)
+    .attr("text-anchor", "middle")
+    .attr("font-size", 10).attr("fill", "#8b8e95")
+    .text("corrélation de Pearson");
+
   // TODO (étapes suivantes) :
-  //  - afficher la valeur r dans chaque cellule + légende de couleur
   //  - tooltip au survol
   //  - clic sur une cellule -> nuage de points des 2 features
   //  - filtre par genre (recalcule la matrice)

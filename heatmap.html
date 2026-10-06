@@ -20,6 +20,7 @@
     header p  { margin: 4px 0 0; color: #5a5f66; font-size: .9rem; }
     main { padding: 24px; }
     #heatmap svg { max-width: 760px; width: 100%; height: auto; }
+    .hint { color: #8b8e95; font-size: .88rem; font-style: italic; margin: 8px 0 0; }
     .tooltip {
       position: fixed;
       pointer-events: none;
@@ -43,6 +44,8 @@
 
   <main>
     <div id="heatmap"></div>
+    <p id="scatter-hint" class="hint">Clique sur une case pour afficher le nuage de points des deux caractéristiques.</p>
+    <div id="scatter"></div>
   </main>
 
   <div id="tip" class="tooltip"></div>

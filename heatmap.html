@@ -21,6 +21,11 @@
     main { padding: 24px; }
     #heatmap svg { max-width: 760px; width: 100%; height: auto; }
     .hint { color: #8b8e95; font-size: .88rem; font-style: italic; margin: 8px 0 0; }
+    .toolbar { margin-bottom: 14px; font-size: .9rem; color: #5a5f66; }
+    .toolbar select {
+      font-size: .9rem; padding: 5px 8px; border: 1px solid #e2e4e8;
+      border-radius: 8px; background: #fff; color: #1e2126;
+    }
     .tooltip {
       position: fixed;
       pointer-events: none;
@@ -43,6 +48,9 @@
   </header>
 
   <main>
+    <div class="toolbar">
+      <label>Genre : <select id="genre-filter"></select></label>
+    </div>
     <div id="heatmap"></div>
     <p id="scatter-hint" class="hint">Clique sur une case pour afficher le nuage de points des deux caractéristiques.</p>
     <div id="scatter"></div>

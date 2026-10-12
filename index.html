@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord - Visualisations D3.js</title>
+
+    <!-- CSS principal -->
+    <link rel="stylesheet" href="./css/styles.css">
+
+    <!-- imports -->
+    <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+
+<body>
+
+    <header>
+        <h1>Tableau de bord interactif</h1>
+    </header>
+
+    <main class="dashboard-grid">
+        <!-- Conteneur pour la visualisation parallèle -->
+        <section class="parallel-coords-chart">
+            <h2>Coordonnées parallèles des titres Spotify</h2>
+            <div id="parallel-coords-chart" class="viz-container"></div>
+        </section>
+
+    </main>
+
+    <!-- Point d'entrée JavaScript (ES Modules si vous utilisez Vite ou JS moderne) -->
+    <script type="module" src="./js/main.js"></script>
+
+</body>
+
+</html>

@@ -45,3 +45,5 @@ const DataLoader = {
   },
   genreColor(g) { return this.GENRE_COLORS[g] || "#9aa0a6"; },
 };
+
+export default DataLoader;

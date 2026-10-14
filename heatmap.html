@@ -4,57 +4,121 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Heatmap de corrélation — Spotify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <style>
-    body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      color: #1e2126;
-      background: #f4f5f7;
+    :root{
+      --bg:#f4f4f1; --surface:#ffffff; --surface-2:#f7f7f5;
+      --ink:#1b1e24; --ink-soft:#585d66; --ink-faint:#9099a3;
+      --line:#e6e7ea; --line-strong:#d4d6db;
+      --accent:#2f6fb0; --accent-soft:#e7f0f8;
+      --div-neg:#2a78d6; --div-mid:#eceef0; --div-pos:#e34848;
+      --diag:#eef0f2; --no-data:#eceef1;
+      --shadow:0 1px 2px rgba(20,22,26,.04), 0 10px 30px -18px rgba(20,22,26,.30);
+      --radius:16px;
     }
-    header {
-      padding: 18px 24px;
-      background: #fff;
-      border-bottom: 1px solid #e2e4e8;
-    }
-    header h1 { margin: 0; font-size: 1.3rem; }
-    header p  { margin: 4px 0 0; color: #5a5f66; font-size: .9rem; }
-    main { padding: 24px; }
-    #heatmap svg { max-width: 760px; width: 100%; height: auto; }
-    .hint { color: #8b8e95; font-size: .88rem; font-style: italic; margin: 8px 0 0; }
-    .toolbar { margin-bottom: 14px; font-size: .9rem; color: #5a5f66; }
-    .toolbar select {
-      font-size: .9rem; padding: 5px 8px; border: 1px solid #e2e4e8;
-      border-radius: 8px; background: #fff; color: #1e2126;
-    }
-    .tooltip {
-      position: fixed;
-      pointer-events: none;
-      display: none;
-      background: #fff;
-      border: 1px solid #e2e4e8;
-      border-radius: 6px;
-      padding: 6px 9px;
-      font-size: 12px;
-      color: #1e2126;
-      box-shadow: 0 4px 14px rgba(0,0,0,.12);
-      z-index: 10;
-    }
+    @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+      --bg:#131519; --surface:#1d2026; --surface-2:#23262d;
+      --ink:#e9eaed; --ink-soft:#aab0b9; --ink-faint:#7b828c;
+      --line:#2b2f37; --line-strong:#3a3f49;
+      --accent:#5b9bd8; --accent-soft:#1b2838;
+      --div-neg:#3987e5; --div-mid:#2f323a; --div-pos:#e66767;
+      --diag:#262a31; --no-data:#262a31;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px -20px rgba(0,0,0,.8);
+    }}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+    .topbar{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:center;justify-content:space-between;
+      padding:16px clamp(16px,4vw,32px);background:var(--surface);border-bottom:1px solid var(--line)}
+    .brand h1{margin:0;font-size:1.2rem;font-weight:600;letter-spacing:-.01em}
+    .brand p{margin:3px 0 0;color:var(--ink-soft);font-size:.86rem;max-width:46ch}
+    .controls{display:flex;align-items:center;gap:10px}
+    .controls label{font-size:.78rem;color:var(--ink-faint);font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.06em}
+    select{font-family:inherit;font-size:.9rem;padding:7px 11px;border:1px solid var(--line-strong);border-radius:10px;
+      background:var(--surface);color:var(--ink);cursor:pointer}
+    select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+    .layout{display:grid;gap:18px;padding:clamp(16px,3vw,28px);
+      grid-template-columns:minmax(0,1.15fr) minmax(0,.95fr);align-items:start;max-width:1200px;margin:0 auto}
+    @media (max-width:860px){ .layout{grid-template-columns:1fr} }
+
+    .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px 18px}
+    .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}
+    .panel-head h2{margin:0;font-size:1rem;font-weight:600}
+    .panel-head .muted{font-size:.76rem;color:var(--ink-faint);font-family:"IBM Plex Mono",monospace}
+    .detail-panel{position:sticky;top:18px}
+
+    #heatmap svg, #scatter svg{display:block;width:100%;height:auto}
+
+    /* légende */
+    .legend{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:.74rem;color:var(--ink-soft);font-family:"IBM Plex Mono",monospace;flex-wrap:wrap}
+    .legend .bar{height:10px;width:160px;border-radius:5px;border:1px solid var(--line)}
+
+    /* état vide du panneau détail */
+    .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      min-height:300px;color:var(--ink-faint);gap:10px;padding:20px}
+    .empty svg{opacity:.5}
+    .empty p{margin:0;font-size:.9rem;max-width:30ch}
+
+    .rbadge{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.8rem;padding:2px 8px;border-radius:999px;
+      background:var(--surface-2);border:1px solid var(--line)}
+
+    .tooltip{position:fixed;pointer-events:none;display:none;z-index:20;
+      background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:7px 10px;
+      font-size:12px;color:var(--ink);box-shadow:var(--shadow);max-width:220px}
+    .tooltip b{color:var(--ink)}
+
+    footer{padding:4px clamp(16px,4vw,32px) 28px;color:var(--ink-faint);font-size:.78rem;max-width:1200px;margin:0 auto}
   </style>
 </head>
 <body>
-  <header>
-    <h1>Heatmap de corrélation</h1>
-    <p>Quelles caractéristiques audio vont ensemble ? (corrélation de Pearson)</p>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Heatmap de corrélation</h1>
+      <p>Quelles caractéristiques audio varient ensemble ? Clique une case pour voir la relation réelle.</p>
+    </div>
+    <div class="controls">
+      <label for="genre-filter">Genre</label>
+      <select id="genre-filter"></select>
+    </div>
   </header>
 
-  <main>
-    <div class="toolbar">
-      <label>Genre : <select id="genre-filter"></select></label>
-    </div>
-    <div id="heatmap"></div>
-    <p id="scatter-hint" class="hint">Clique sur une case pour afficher le nuage de points des deux caractéristiques.</p>
-    <div id="scatter"></div>
+  <main class="layout">
+    <section class="panel matrix-panel">
+      <div class="panel-head">
+        <h2>Matrice</h2>
+        <span class="muted" id="matrix-sub">corrélation de Pearson</span>
+      </div>
+      <div id="heatmap"></div>
+      <div class="legend">
+        <span>−1</span><span class="bar" id="legend-bar"></span><span>+1</span>
+        <span style="margin-left:10px">négatif → positif</span>
+      </div>
+    </section>
+
+    <section class="panel detail-panel">
+      <div class="panel-head">
+        <h2 id="detail-title">Relation détaillée</h2>
+        <span class="rbadge" id="detail-r" hidden></span>
+      </div>
+      <div id="detail">
+        <div class="empty">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="7" cy="17" r="1.4"/><circle cx="11" cy="12" r="1.4"/><circle cx="15" cy="14" r="1.4"/>
+            <circle cx="18" cy="8" r="1.4"/><path d="M3 21V4" stroke-linecap="round"/><path d="M3 21h18" stroke-linecap="round"/>
+          </svg>
+          <p>Clique sur une case de la matrice pour afficher le nuage de points des deux caractéristiques.</p>
+        </div>
+      </div>
+      <div id="scatter"></div>
+    </section>
   </main>
+
+  <footer id="coverage"></footer>
 
   <div id="tip" class="tooltip"></div>
 

@@ -1,0 +1,91 @@
+/* ============================================================
+   Treemap — styles de la vue (Arij)
+   Thème clair/sombre par variables : le sombre suit le système
+   ou l'attribut data-theme="dark|light" posé sur <html>.
+   ============================================================ */
+.tm-page, .tm-root {
+  color-scheme: light;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --frame: #f0efec;
+  --grid: #e4e3df;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #787772;
+  --accent: #6250d6;
+  --danger: #c62f2f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .tm-page,
+  :root:where(:not([data-theme="light"])) .tm-root {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-2: #242423; --frame: #2a2a28; --grid: #383835;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #9a998f;
+    --accent: #9085e9; --danger: #e66767;
+  }
+}
+:root[data-theme="dark"] .tm-page,
+:root[data-theme="dark"] .tm-root {
+  color-scheme: dark;
+  --surface: #1a1a19; --surface-2: #242423; --frame: #2a2a28; --grid: #383835;
+  --text: #f0efec; --text-2: #c3c2b7; --text-3: #9a998f;
+  --accent: #9085e9; --danger: #e66767;
+}
+
+/* ---------- page de démo ---------- */
+.tm-page {
+  margin: 0;
+  padding: 16px 20px 40px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+.tm-header h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
+.tm-lead { margin: 0 0 12px; font-size: 14px; color: var(--text-2); }
+
+/* ---------- la vue : 4 zones ----------
+   ┌──────────────── filtres ────────────────┐
+   ├──────────── fil d'Ariane ───────────────┤
+   ├──────── scène ─────────┬── panneau ─────┤
+   └────────────────────────┴────────────────┘ */
+.tm-root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-areas:
+    "filters filters"
+    "nav     nav"
+    "scene   aside";
+  gap: 10px 16px;
+}
+.tm-root * { box-sizing: border-box; }
+.tm-root button { font: inherit; color: inherit; cursor: pointer; }
+
+.tm-filters { grid-area: filters; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  min-height: 36px; padding: 6px 10px; background: var(--surface-2); border-radius: 8px; }
+.tm-nav     { grid-area: nav; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  min-height: 28px; color: var(--text-2); }
+.tm-scene   { grid-area: scene; position: relative; min-height: 520px;
+  border: 1px solid var(--grid); border-radius: 8px; background: var(--frame); overflow: hidden; }
+.tm-aside   { grid-area: aside; display: flex; flex-direction: column; gap: 12px; }
+
+.tm-placeholder { color: var(--text-3); font-size: 13px; }
+.tm-card { padding: 12px; background: var(--surface-2); border-radius: 8px; }
+.tm-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 6px; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .04em; }
+
+/* états de la scène : chargement / erreur / message */
+.tm-status { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 6px;
+  align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--text-2); }
+.tm-status.is-error { color: var(--danger); }
+.tm-status code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--text); }
+
+/* écran étroit : le panneau passe sous la scène */
+@media (max-width: 900px) {
+  .tm-root { grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "filters" "nav" "scene" "aside"; }
+  .tm-scene { min-height: 380px; }
+}

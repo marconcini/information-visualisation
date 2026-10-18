@@ -68,7 +68,7 @@
   min-height: 36px; padding: 6px 10px; background: var(--surface-2); border-radius: 8px; }
 .tm-nav     { grid-area: nav; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
   min-height: 28px; color: var(--text-2); }
-.tm-scene   { grid-area: scene; position: relative; min-height: 520px;
+.tm-scene   { grid-area: scene; position: relative; height: clamp(420px, 68vh, 680px);
   border: 1px solid var(--grid); border-radius: 8px; background: var(--frame); overflow: hidden; }
 .tm-aside   { grid-area: aside; display: flex; flex-direction: column; gap: 12px; }
 
@@ -83,9 +83,17 @@
 .tm-status.is-error { color: var(--danger); }
 .tm-status code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--text); }
 
+/* ---------- treemap (SVG) ---------- */
+.tm-svg { position: absolute; inset: 0; display: block; }
+.tm-status[hidden] { display: none; }
+.tm-group-label { font-size: 12px; font-weight: 600; pointer-events: none; }
+.tm-name   { font-size: 12px; font-weight: 600; pointer-events: none; }
+.tm-count  { font-size: 11px; opacity: .85; pointer-events: none; }
+.tm-cell rect.is-other { fill-opacity: .55; }   /* « Autres » : regroupement, pas un artiste */
+
 /* écran étroit : le panneau passe sous la scène */
 @media (max-width: 900px) {
   .tm-root { grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "filters" "nav" "scene" "aside"; }
-  .tm-scene { min-height: 380px; }
+  .tm-scene { height: clamp(360px, 60vh, 520px); }
 }

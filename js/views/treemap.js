@@ -18,7 +18,6 @@
   }
 
   function aggregateArtist(artist, decades) {
-    if (!artist.dec) return { name: artist.name, kind: "artist", count: artist.value || 0, popSum: 0, dec: {} };
     let count = 0, popSum = 0;
     for (const [dec, [n, pop]] of Object.entries(artist.dec)) {
       if (decades.size && !decades.has(+dec)) continue;
@@ -34,12 +33,12 @@
     return node;
   }
 
-  function prepare(raw, { decades = new Set(), minPopularity = 0 } = {}) {
+  function prepare(raw, { decades = new Set() } = {}) {
     const genres = raw.children.map((g) => {
       const subgenres = g.children.map((s) => {
         const artists = s.children
           .map((a) => ({ ...aggregateArtist(a, decades), genre: g.name }))
-          .filter((a) => a.count > 0 && a.popSum / a.count >= minPopularity)
+          .filter((a) => a.count > 0)
           .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
         return sumUp({ name: s.name, kind: "subgenre", genre: g.name, children: artists });
       }).filter((s) => s.count > 0);
@@ -98,9 +97,9 @@
     return { ...display(focus), children: kids.map((g) => ({ ...display(g), children: g.children.map(display) })) };
   }
 
-  function layout(data, width, height, sizeBy) {
+  function layout(data, width, height) {
     const root = d3.hierarchy(data)
-      .sum((d) => (d.children ? 0 : sizeBy === "popularity" ? d.popSum : d.count))
+      .sum((d) => (d.children ? 0 : d.count))
       .sort((a, b) => b.value - a.value || d3.ascending(a.data.name, b.data.name));
 
     d3.treemap()
@@ -143,9 +142,7 @@
     const state = {
       raw: null,
       focusPath: [],
-      sizeBy: "count",
       decades: new Set(),
-      minPopularity: 0,
       selectedPath: null,
       limit: ARTIST_STEP,
     };
@@ -391,7 +388,7 @@
       }
       status.hidden = true;
 
-      const tree = layout(displayTree(focus, state.limit), width, height, state.sizeBy);
+      const tree = layout(displayTree(focus, state.limit), width, height);
       currentTree = tree;
       renderTail(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);

@@ -149,6 +149,7 @@
     let prepared = null;
     let currentTree = null;
     let busy = false;
+    let resizePending = false;
 
     container.innerHTML = "";
     const root = el("div", "tm-root", null, container);
@@ -182,7 +183,17 @@
     }
 
     function update() {
+      if (!state.raw) return;
       prepared = prepare(state.raw, state);
+
+      while (state.focusPath.length && !findByPath(prepared, state.focusPath)) {
+        state.focusPath = state.focusPath.slice(0, -1);
+      }
+      if (state.selectedPath && !findByPath(prepared, state.selectedPath)) {
+        state.selectedPath = null;
+      }
+
+      hideTip();
       renderNav();
       render();
       renderCard();
@@ -250,7 +261,7 @@
       const node = findByPath(prepared, path);
       if (!node) return;
       if (node.children && node.children.length) {
-        zoomTo(path, rectFor(path) || { x: 0, y: 0, w: scene.clientWidth, h: scene.clientHeight });
+        zoomTo(path);
       } else {
         select(path);
       }
@@ -333,6 +344,7 @@
 
     function zoomTo(path, from) {
       if (busy || samePath(path, state.focusPath)) return;
+      const start = from || rectFor(path) || { x: 0, y: 0, w: scene.clientWidth, h: scene.clientHeight };
       const previous = state.focusPath;
       state.focusPath = path;
       state.selectedPath = null;
@@ -340,7 +352,7 @@
       hideTip();
       renderNav();
       renderCard();
-      render(path.length > previous.length ? { dir: "in", from } : { dir: "out", previous });
+      render(path.length > previous.length ? { dir: "in", from: start } : { dir: "out", previous });
     }
 
     function zoomOut() {
@@ -374,12 +386,7 @@
       const width = scene.clientWidth, height = scene.clientHeight;
       if (!prepared || !width || !height) return;
 
-      const focus = findByPath(prepared, state.focusPath);
-      if (!focus) {
-        state.focusPath = [];
-        renderNav();
-        return render();
-      }
+      const focus = findByPath(prepared, state.focusPath) || prepared;
       if (!focus.count) {
         svg.selectAll("g.tm-layer").remove();
         tailBar.hidden = true;
@@ -433,6 +440,10 @@
       t.end().catch(() => {}).then(() => {
         busy = false;
         layer.attr("transform", null);
+        if (resizePending) {
+          resizePending = false;
+          render();
+        }
       });
     }
 
@@ -582,31 +593,45 @@
       });
     }
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && root.isConnected) zoomOut();
-    });
+    function onKeydown(event) {
+      if (event.key === "Escape") zoomOut();
+    }
+    document.addEventListener("keydown", onKeydown);
 
     let frame = 0;
-    new ResizeObserver(() => {
+    const observer = new ResizeObserver(() => {
+      if (busy) {
+        resizePending = true;
+        return;
+      }
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => render());
-    }).observe(scene);
+    });
+    observer.observe(scene);
 
-    DataLoader.hierarchy()
-      .then((raw) => {
-        state.raw = raw;
-        update();
-      })
-      .catch((err) => {
-        console.error(err);
-        status.classList.add("is-error");
-        status.innerHTML = "";
-        el("strong", null, "Impossible de charger les données.", status);
-        const hint = el("span", null, "Lancez un serveur local à la racine du projet : ", status);
-        el("code", null, "python -m http.server 8000", hint);
-      });
+    function showLoadError(err) {
+      console.error(err);
+      status.hidden = false;
+      status.classList.add("is-error");
+      status.innerHTML = "";
+      el("strong", null, "Impossible de charger les données.", status);
+      el("span", null, "Vérifiez que data/derived/hierarchy.json existe et que la page est servie par un serveur local.", status);
+    }
 
-    return { state, update, render, zoomTo };
+    DataLoader.hierarchy().then((raw) => {
+      state.raw = raw;
+      update();
+    }, showLoadError);
+
+    function destroy() {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeydown);
+      svg.selectAll("*").interrupt();
+      container.innerHTML = "";
+    }
+
+    return { state, update, render, zoomTo, destroy };
   }
 
   window.TreemapView = { mount, prepare, popMean };

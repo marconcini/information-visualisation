@@ -153,12 +153,12 @@
     let busy = false;
     let renderPending = false;
 
-    function requestRender() {
+    function requestRender(smooth = false) {
       if (busy) {
         renderPending = true;
         return;
       }
-      render();
+      render(null, smooth);
     }
 
     container.innerHTML = "";
@@ -188,7 +188,54 @@
       });
       return button;
     });
+    const decadeControl = el("div", "tm-control", null, filters);
+    el("span", "tm-control-label", "Décennies", decadeControl);
+    const chips = el("div", "tm-chips", null, decadeControl);
+    chips.setAttribute("role", "group");
+    chips.setAttribute("aria-label", "Filtrer par décennie");
     const legend = el("div", "tm-legend", null, filters);
+
+    function decadeCounts(raw) {
+      const counts = new Map();
+      for (const g of raw.children) {
+        for (const s of g.children) {
+          for (const a of s.children) {
+            for (const [dec, [n]] of Object.entries(a.dec)) counts.set(+dec, (counts.get(+dec) || 0) + n);
+          }
+        }
+      }
+      return [...counts].sort(([a], [b]) => a - b);
+    }
+
+    function renderChips() {
+      chips.innerHTML = "";
+      const all = el("button", "tm-chip", "Toutes", chips);
+      all.type = "button";
+      all.setAttribute("aria-pressed", String(state.decades.size === 0));
+      all.addEventListener("click", () => setDecades(new Set()));
+
+      for (const [dec, count] of decadeCounts(state.raw)) {
+        const chip = el("button", "tm-chip", String(dec), chips);
+        chip.type = "button";
+        chip.title = `Années ${dec} : ${fmtN(count)} titres`;
+        chip.setAttribute("aria-label", `Années ${dec}, ${fmtN(count)} titres`);
+        chip.setAttribute("aria-pressed", String(state.decades.has(dec)));
+        chip.addEventListener("click", () => {
+          const next = new Set(state.decades);
+          if (next.has(dec)) next.delete(dec);
+          else next.add(dec);
+          setDecades(next);
+        });
+      }
+    }
+
+    function setDecades(decades) {
+      const focused = chips.contains(document.activeElement) ? document.activeElement.textContent : null;
+      state.decades = decades;
+      renderChips();
+      if (focused) [...chips.children].find((b) => b.textContent === focused)?.focus();
+      update(true);
+    }
 
     function syncColorButtons() {
       colorButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === state.colorBy)));
@@ -276,7 +323,7 @@
       status.textContent = msg;
     }
 
-    function update() {
+    function update(smooth = false) {
       if (!state.raw) return;
       prepared = prepare(state.raw, state);
 
@@ -289,7 +336,7 @@
 
       hideTip();
       renderNav();
-      render();
+      requestRender(smooth);
       renderCard();
     }
 
@@ -485,7 +532,7 @@
       });
     }
 
-    function render(anim) {
+    function render(anim, smooth = false) {
       const width = scene.clientWidth, height = scene.clientHeight;
       if (!prepared || !width || !height) return;
 
@@ -510,7 +557,7 @@
 
       const old = svg.select("g.tm-layer");
       const layer = anim || old.empty() ? svg.append("g").attr("class", "tm-layer") : old;
-      draw(layer, tree);
+      draw(layer, tree, smooth && !anim);
       highlight();
       if (anim && !old.empty()) animate(old, layer, anim, tree, width, height);
       else svg.selectAll("g.tm-layer").filter(function () { return this !== layer.node(); }).remove();
@@ -658,7 +705,8 @@
         .on("blur", hideTip);
     }
 
-    function draw(layer, tree) {
+    function draw(layer, tree, smooth) {
+      const move = (sel) => (smooth ? sel.transition().duration(450).ease(d3.easeCubicOut) : sel);
       const groups = layer.selectAll("g.tm-group")
         .data(tree.children || [], keyOf)
         .join((enter) => {
@@ -674,17 +722,18 @@
         .on("click", (event, d) => activate(d))
         .call(makeAccessible);
 
-      groups.select(".tm-frame")
+      move(groups.select(".tm-frame"))
         .call(placeRect, 4)
         .attr("fill", paint);
 
       groups.classed("has-summary", (d) => Boolean(d.data.summary));
 
       groups.select(".tm-group-label")
-        .attr("x", (d) => d.x0 + (d.data.summary ? 8 : 6))
-        .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : d.data.summary ? 22 : 16))
         .attr("fill", (d) => (d.children ? "var(--text)" : ink(d)))
         .text((d) => truncate(`${labelOf(d)} · ${fmtN(d.value)}`, Math.floor((widthOf(d) - 12) / 7)));
+      move(groups.select(".tm-group-label"))
+        .attr("x", (d) => d.x0 + (d.data.summary ? 8 : 6))
+        .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : d.data.summary ? 22 : 16));
 
       groups.each(function (d) {
         const rows = summaryRows(d);
@@ -730,19 +779,19 @@
           })
           .call(makeAccessible);
 
-        cells.select("rect")
+        move(cells.select("rect"))
           .call(placeRect, 2)
           .attr("fill", paint);
 
         cells.select(".tm-name")
-          .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 15)
           .attr("fill", ink)
           .text((d) => (heightOf(d) >= 20 ? truncate(labelOf(d), Math.floor((widthOf(d) - 10) / 7)) : ""));
+        move(cells.select(".tm-name")).attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 15);
 
         cells.select(".tm-count")
-          .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 29)
           .attr("fill", ink)
           .text((d) => (heightOf(d) >= 36 && widthOf(d) >= 60 ? `${fmtN(d.value)} titres` : ""));
+        move(cells.select(".tm-count")).attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 29);
       });
     }
 
@@ -776,6 +825,7 @@
       .then((raw) => {
         if (destroyed) return;
         state.raw = raw;
+        renderChips();
         update();
       })
       .catch((err) => {

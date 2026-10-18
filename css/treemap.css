@@ -1,8 +1,3 @@
-/* ============================================================
-   Treemap — styles de la vue (Arij)
-   Thème clair/sombre par variables : le sombre suit le système
-   ou l'attribut data-theme="dark|light" posé sur <html>.
-   ============================================================ */
 .tm-page, .tm-root {
   color-scheme: light;
   --surface: #fcfcfb;
@@ -32,7 +27,6 @@
   --accent: #9085e9; --danger: #e66767;
 }
 
-/* ---------- page de démo ---------- */
 .tm-page {
   margin: 0;
   padding: 16px 20px 40px;
@@ -43,11 +37,6 @@
 .tm-header h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
 .tm-lead { margin: 0 0 12px; font-size: 14px; color: var(--text-2); }
 
-/* ---------- la vue : 4 zones ----------
-   ┌──────────────── filtres ────────────────┐
-   ├──────────── fil d'Ariane ───────────────┤
-   ├──────── scène ─────────┬── panneau ─────┤
-   └────────────────────────┴────────────────┘ */
 .tm-root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 14px;
@@ -77,21 +66,31 @@
 .tm-card h2 { font-size: 13px; font-weight: 600; margin: 0 0 6px; color: var(--text-2);
   text-transform: uppercase; letter-spacing: .04em; }
 
-/* états de la scène : chargement / erreur / message */
 .tm-status { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 6px;
   align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--text-2); }
 .tm-status.is-error { color: var(--danger); }
 .tm-status code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--text); }
 
-/* ---------- treemap (SVG) ---------- */
 .tm-svg { position: absolute; inset: 0; display: block; }
 .tm-status[hidden] { display: none; }
 .tm-group-label { font-size: 12px; font-weight: 600; pointer-events: none; }
 .tm-name   { font-size: 12px; font-weight: 600; pointer-events: none; }
 .tm-count  { font-size: 11px; opacity: .85; pointer-events: none; }
-.tm-cell rect.is-other { fill-opacity: .55; }   /* « Autres » : regroupement, pas un artiste */
+.tm-svg .is-other { stroke: #6f6e69; stroke-width: 1; stroke-dasharray: 4 3; }
 
-/* écran étroit : le panneau passe sous la scène */
+.tm-group.is-zoomable .tm-frame, .tm-cell.is-zoomable { cursor: pointer; }
+.tm-cell.is-zoomable:hover rect,
+.tm-group.is-leaf.is-zoomable:hover .tm-frame { stroke: var(--text); stroke-width: 2; }
+.tm-group.is-zoomable:hover > .tm-frame { fill-opacity: .34; }
+
+.tm-nav .tm-up { width: 28px; height: 28px; border: 1px solid var(--grid); border-radius: 6px;
+  background: var(--surface-2); line-height: 1; }
+.tm-nav .tm-up:disabled { opacity: .4; cursor: default; }
+.tm-crumb { border: 0; background: none; padding: 2px 4px; border-radius: 4px; color: var(--accent); }
+button.tm-crumb:hover { background: var(--surface-2); text-decoration: underline; }
+.tm-crumb.is-current { color: var(--text); font-weight: 600; }
+.tm-sep { color: var(--text-3); }
+
 @media (max-width: 900px) {
   .tm-root { grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "filters" "nav" "scene" "aside"; }

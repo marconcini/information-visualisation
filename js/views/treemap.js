@@ -5,6 +5,9 @@
   const SUMMARY_ARTISTS = 5;
   const CONCENTRATION = 10;
   const HEADER = 22;
+  const BLUE_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
+    "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
+  const LEVEL_LABEL = { subgenre: "par sous-genre", artist: "par artiste" };
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
@@ -113,9 +116,7 @@
     return root;
   }
 
-  const fillOf = (d) => DataLoader.genreColor(d.data.genre || d.data.name);
   const textOn = (fill) => (d3.lab(fill).l > 62 ? "#0b0b0b" : "#ffffff");
-  const labelFill = (d) => textOn(fillOf(d));
   const titlesRange = (min, max) => (min === max ? `${min} titre${min > 1 ? "s" : ""}` : `${min} à ${max} titres`);
   const labelOf = (d) => (d.data.kind === "genre" && DataLoader.GENRE_LABELS[d.data.name]) || d.data.name;
   const widthOf = (d) => Math.max(0, d.x1 - d.x0);
@@ -145,11 +146,20 @@
       decades: new Set(),
       selectedPath: null,
       limit: ARTIST_STEP,
+      colorBy: "genre",
     };
     let prepared = null;
     let currentTree = null;
     let busy = false;
-    let resizePending = false;
+    let renderPending = false;
+
+    function requestRender() {
+      if (busy) {
+        renderPending = true;
+        return;
+      }
+      render();
+    }
 
     container.innerHTML = "";
     const root = el("div", "tm-root", null, container);
@@ -160,7 +170,89 @@
     const aside = el("aside", "tm-aside", null, root);
     nav.setAttribute("aria-label", "Fil d'Ariane");
 
-    el("span", "tm-placeholder", "Filtres", filters);
+    const colorControl = el("div", "tm-control", null, filters);
+    el("span", "tm-control-label", "Couleur", colorControl);
+    const segment = el("div", "tm-seg", null, colorControl);
+    segment.setAttribute("role", "group");
+    segment.setAttribute("aria-label", "Ce que représente la couleur");
+    const colorButtons = [["genre", "Genre"], ["popularity", "Popularité moyenne"]].map(([value, label]) => {
+      const button = el("button", "tm-seg-btn", label, segment);
+      button.type = "button";
+      button.dataset.value = value;
+      button.addEventListener("click", () => {
+        if (state.colorBy === value) return;
+        state.colorBy = value;
+        syncColorButtons();
+        hideTip();
+        requestRender();
+      });
+      return button;
+    });
+    const legend = el("div", "tm-legend", null, filters);
+
+    function syncColorButtons() {
+      colorButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === state.colorBy)));
+    }
+    syncColorButtons();
+
+    let popScale = null;
+    let popLevel = null;
+    let theme = { dark: false, surface: "#fcfcfb", frame: "#f0efec" };
+    const byPopularity = () => state.colorBy === "popularity";
+
+    function readTheme() {
+      const css = getComputedStyle(root);
+      theme = {
+        dark: css.colorScheme === "dark",
+        surface: css.getPropertyValue("--surface").trim(),
+        frame: css.getPropertyValue("--frame").trim(),
+      };
+    }
+
+    const tint = (hue, amount) => d3.interpolateRgb(theme.surface, hue)(amount);
+    const genreTint = (g, isGroup) => tint(DataLoader.genreColor(g), isGroup ? 0.18 : theme.dark ? 0.55 : 0.42);
+
+    function paint(d) {
+      if (!byPopularity()) return genreTint(d.data.genre || d.data.name, Boolean(d.children));
+      const pop = popMean(d.data);
+      return d.children || pop == null ? theme.frame : popScale(pop);
+    }
+    const ink = (d) => textOn(paint(d));
+
+    function levelExtent(kind) {
+      const values = [];
+      (function walk(n) {
+        if (n.kind === kind) {
+          const v = popMean(n);
+          if (Number.isFinite(v)) values.push(v);
+          return;
+        }
+        (n.children || []).forEach(walk);
+      })(prepared);
+      let [lo, hi] = values.length ? d3.extent(values) : [0, 100];
+      if (Math.round(lo) === Math.round(hi)) [lo, hi] = [lo - 1, hi + 1];
+      return [lo, hi];
+    }
+
+    function renderLegend() {
+      legend.innerHTML = "";
+      if (byPopularity() && popScale) {
+        const [lo, hi] = popScale.domain();
+        el("span", null, `Popularité moyenne des titres, ${LEVEL_LABEL[popLevel] || ""}`, legend);
+        el("span", "tm-legend-value", String(Math.round(lo)), legend);
+        const ramp = el("span", "tm-ramp", null, legend);
+        ramp.style.background = `linear-gradient(to right, ${d3.range(0, 1.01, 0.1).map((t) => popScale.interpolator()(t)).join(", ")})`;
+        el("span", "tm-legend-value", String(Math.round(hi)), legend);
+        return;
+      }
+      DataLoader.GENRES.forEach((g) => {
+        const item = el("span", "tm-swatch-item", null, legend);
+        const swatch = el("span", "tm-swatch", null, item);
+        swatch.style.background = genreTint(g, false);
+        swatch.style.boxShadow = `inset 3px 0 0 ${DataLoader.genreColor(g)}`;
+        el("span", null, DataLoader.GENRE_LABELS[g] || g, item);
+      });
+    }
     const card = el("section", "tm-card", null, aside);
     card.setAttribute("aria-live", "polite");
 
@@ -221,7 +313,7 @@
       const parts = [`${fmtN(node.count)} titres`];
       if (share != null) parts.push(`${fmtPct(share)} de ${nameOf(parent)}`);
       el("div", null, parts.join(" · "), tip);
-      if (pop != null) el("div", null, `Popularité moyenne : ${Math.round(pop)}`, tip);
+      if (pop != null) el("div", null, `Popularité moyenne des titres : ${Math.round(pop)}`, tip);
       el("div", "tm-tip-hint", isZoomable(d) ? "Cliquer pour explorer" : "Cliquer pour le détail", tip);
       placeTip(event);
     }
@@ -306,7 +398,7 @@
       };
       stat("Titres", fmtN(node.count));
       if (share != null) stat(`Part de ${nameOf(parent)}`, fmtPct(share));
-      if (pop != null) stat("Popularité moyenne", String(Math.round(pop)));
+      if (pop != null) stat("Popularité moyenne des titres", String(Math.round(pop)));
       if (node.kind === "subgenre") {
         stat("Artistes", fmtN(node.children.length));
         if (node.children.length > CONCENTRATION) {
@@ -397,6 +489,11 @@
 
       const tree = layout(displayTree(focus, state.limit), width, height);
       currentTree = tree;
+      readTheme();
+      popLevel = tree.leaves()[0] ? tree.leaves()[0].data.kind : null;
+      const ramp = theme.dark ? [...BLUE_RAMP].reverse() : BLUE_RAMP;
+      popScale = d3.scaleSequential(d3.interpolateRgbBasis(ramp)).domain(levelExtent(popLevel)).clamp(true);
+      renderLegend();
       renderTail(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);
 
@@ -430,6 +527,7 @@
         .attr("transform", zoomIn ? fit(target) : expand(target))
         .attr("opacity", zoomIn ? 1 : 0);
       if (!zoomIn) old.raise();
+      old.attr("pointer-events", "none");
 
       const t = svg.transition().duration(duration).ease(d3.easeCubicInOut);
       layer.transition(t).attr("transform", identity).attr("opacity", 1);
@@ -440,8 +538,8 @@
       t.end().catch(() => {}).then(() => {
         busy = false;
         layer.attr("transform", null);
-        if (resizePending) {
-          resizePending = false;
+        if (renderPending) {
+          renderPending = false;
           render();
         }
       });
@@ -474,7 +572,7 @@
       const showMore = (limit) => {
         state.limit = limit;
         hideTip();
-        render();
+        requestRender();
       };
       const more = el("button", "tm-more", `Afficher ${Math.min(ARTIST_STEP, rest.length)} de plus`, actions);
       more.type = "button";
@@ -529,20 +627,19 @@
 
       groups.select(".tm-frame")
         .call(placeRect, 4)
-        .attr("fill", fillOf)
-        .attr("fill-opacity", (d) => (d.children ? 0.22 : 1));
+        .attr("fill", paint);
 
       groups.classed("has-summary", (d) => Boolean(d.data.summary));
 
       groups.select(".tm-group-label")
         .attr("x", (d) => d.x0 + (d.data.summary ? 8 : 6))
         .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : d.data.summary ? 22 : 16))
-        .attr("fill", (d) => (d.children ? "var(--text)" : labelFill(d)))
+        .attr("fill", (d) => (d.children ? "var(--text)" : ink(d)))
         .text((d) => truncate(`${labelOf(d)} · ${fmtN(d.value)}`, Math.floor((widthOf(d) - 12) / 7)));
 
       groups.each(function (d) {
         const rows = summaryRows(d);
-        const color = labelFill(d);
+        const color = ink(d);
         const y = (r) => d.y0 + 44 + r.i * 18;
         const g = d3.select(this);
         g.selectAll("text.tm-row")
@@ -585,16 +682,16 @@
 
         cells.select("rect")
           .call(placeRect, 2)
-          .attr("fill", fillOf);
+          .attr("fill", paint);
 
         cells.select(".tm-name")
           .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 15)
-          .attr("fill", labelFill)
+          .attr("fill", ink)
           .text((d) => (heightOf(d) >= 20 ? truncate(labelOf(d), Math.floor((widthOf(d) - 10) / 7)) : ""));
 
         cells.select(".tm-count")
           .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 29)
-          .attr("fill", labelFill)
+          .attr("fill", ink)
           .text((d) => (heightOf(d) >= 36 && widthOf(d) >= 60 ? `${fmtN(d.value)} titres` : ""));
       });
     }
@@ -607,7 +704,7 @@
     let frame = 0;
     const observer = new ResizeObserver(() => {
       if (busy) {
-        resizePending = true;
+        renderPending = true;
         return;
       }
       cancelAnimationFrame(frame);

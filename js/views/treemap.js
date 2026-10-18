@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const TOP_ARTISTS = 60;
+  const ARTIST_STEP = 30;
+  const SUMMARY_ARTISTS = 5;
+  const CONCENTRATION = 10;
   const HEADER = 22;
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
@@ -32,27 +34,14 @@
     return node;
   }
 
-  function prepare(raw, { decades = new Set(), minPopularity = 0, topN = TOP_ARTISTS } = {}) {
+  function prepare(raw, { decades = new Set(), minPopularity = 0 } = {}) {
     const genres = raw.children.map((g) => {
       const subgenres = g.children.map((s) => {
         const artists = s.children
           .map((a) => ({ ...aggregateArtist(a, decades), genre: g.name }))
           .filter((a) => a.count > 0 && a.popSum / a.count >= minPopularity)
           .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
-
-        const kept = artists.slice(0, topN);
-        const rest = artists.slice(topN);
-        if (rest.length) {
-          kept.push({
-            name: `Autres (${rest.length} artistes)`,
-            kind: "other",
-            genre: g.name,
-            artists: rest.length,
-            count: d3.sum(rest, (a) => a.count),
-            popSum: d3.sum(rest, (a) => a.popSum),
-          });
-        }
-        return sumUp({ name: s.name, kind: "subgenre", genre: g.name, children: kept });
+        return sumUp({ name: s.name, kind: "subgenre", genre: g.name, children: artists });
       }).filter((s) => s.count > 0);
 
       return sumUp({ name: g.name, kind: "genre", genre: g.name, children: subgenres });
@@ -72,13 +61,47 @@
     return node;
   }
 
-  const OTHER_FILL = "#a8a7a1";
-  const isOther = (d) => d.data.kind === "other";
+  function display(node) {
+    return {
+      name: node.name,
+      kind: node.kind,
+      genre: node.genre,
+      count: node.count,
+      popSum: node.popSum,
+      zoomable: Boolean(node.children && node.children.length),
+    };
+  }
+
+  function summarize(sub, parent) {
+    const artists = sub.children;
+    return {
+      share: parent.count ? sub.count / parent.count : 0,
+      artists: artists.length,
+      top: artists.slice(0, SUMMARY_ARTISTS).map((a) => ({ name: a.name, count: a.count })),
+      concentration: artists.length > CONCENTRATION
+        ? d3.sum(artists.slice(0, CONCENTRATION), (a) => a.count) / sub.count
+        : null,
+    };
+  }
+
+  function displayTree(focus, limit) {
+    const kids = focus.children || [];
+    if (focus.kind === "subgenre") {
+      return { ...display(focus), children: kids.slice(0, limit).map(display) };
+    }
+    if (focus.kind === "genre") {
+      return {
+        ...display(focus),
+        children: kids.map((s) => ({ ...display(s), summary: summarize(s, focus) })),
+      };
+    }
+    return { ...display(focus), children: kids.map((g) => ({ ...display(g), children: g.children.map(display) })) };
+  }
 
   function layout(data, width, height, sizeBy) {
     const root = d3.hierarchy(data)
       .sum((d) => (d.children ? 0 : sizeBy === "popularity" ? d.popSum : d.count))
-      .sort((a, b) => isOther(a) - isOther(b) || b.value - a.value || d3.ascending(a.data.name, b.data.name));
+      .sort((a, b) => b.value - a.value || d3.ascending(a.data.name, b.data.name));
 
     d3.treemap()
       .tile(d3.treemapSquarify.ratio(1))
@@ -91,8 +114,10 @@
     return root;
   }
 
-  const fillOf = (d) => (isOther(d) ? OTHER_FILL : DataLoader.genreColor(d.data.genre || d.data.name));
+  const fillOf = (d) => DataLoader.genreColor(d.data.genre || d.data.name);
   const textOn = (fill) => (d3.lab(fill).l > 62 ? "#0b0b0b" : "#ffffff");
+  const labelFill = (d) => textOn(fillOf(d));
+  const titlesRange = (min, max) => (min === max ? `${min} titre${min > 1 ? "s" : ""}` : `${min} à ${max} titres`);
   const labelOf = (d) => (d.data.kind === "genre" && DataLoader.GENRE_LABELS[d.data.name]) || d.data.name;
   const widthOf = (d) => Math.max(0, d.x1 - d.x0);
   const heightOf = (d) => Math.max(0, d.y1 - d.y0);
@@ -107,10 +132,10 @@
   const DURATION = 750;
   const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const samePath = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
-  const isZoomable = (d) => Boolean(d.children) && !isOther(d);
-  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", artist: "artiste", other: "regroupement" };
+  const isZoomable = (d) => Boolean(d.data.zoomable);
+  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", artist: "artiste" };
   const CHILD_LABEL = { root: "Genres", genre: "Sous-genres", subgenre: "Principaux artistes" };
-  const fmtPct = d3.format(".0%");
+  const fmtPct = (v) => `${Math.round(v * 100)}\u00a0%`;
   const nameOf = (data) => (data.kind === "genre" && DataLoader.GENRE_LABELS[data.name]) || data.name;
   const box = (d) => ({ x: d.x0, y: d.y0, w: Math.max(1, d.x1 - d.x0), h: Math.max(1, d.y1 - d.y0) });
 
@@ -122,6 +147,7 @@
       decades: new Set(),
       minPopularity: 0,
       selectedPath: null,
+      limit: ARTIST_STEP,
     };
     let prepared = null;
     let currentTree = null;
@@ -132,6 +158,7 @@
     const filters = el("div", "tm-filters", null, root);
     const nav = el("nav", "tm-nav", null, root);
     const scene = el("div", "tm-scene", null, root);
+    const tailBar = el("div", "tm-tail", null, root);
     const aside = el("aside", "tm-aside", null, root);
     nav.setAttribute("aria-label", "Fil d'Ariane");
 
@@ -177,19 +204,21 @@
     }
 
     function showTip(event, d) {
+      tip.innerHTML = "";
       const info = stats(pathOf(d));
       if (!info) return;
       const { node, parent, share, pop } = info;
-      tip.innerHTML = "";
       const head = el("div", "tm-tip-title", nameOf(node), tip);
       el("span", "tm-tip-kind", ` · ${KIND_LABEL[node.kind]}`, head);
       const parts = [`${fmtN(node.count)} titres`];
       if (share != null) parts.push(`${fmtPct(share)} de ${nameOf(parent)}`);
       el("div", null, parts.join(" · "), tip);
-      if (node.kind === "other") el("div", null, `${fmtN(node.artists)} artistes avec peu de titres`, tip);
       if (pop != null) el("div", null, `Popularité moyenne : ${Math.round(pop)}`, tip);
       el("div", "tm-tip-hint", isZoomable(d) ? "Cliquer pour explorer" : "Cliquer pour le détail", tip);
+      placeTip(event);
+    }
 
+    function placeTip(event) {
       tip.hidden = false;
       const [x, y] = d3.pointer(event, scene);
       const { clientWidth: w, clientHeight: h } = scene;
@@ -223,7 +252,7 @@
     function open(path) {
       const node = findByPath(prepared, path);
       if (!node) return;
-      if (node.children && node.kind !== "other") {
+      if (node.children && node.children.length) {
         zoomTo(path, rectFor(path) || { x: 0, y: 0, w: scene.clientWidth, h: scene.clientHeight });
       } else {
         select(path);
@@ -270,12 +299,18 @@
       stat("Titres", fmtN(node.count));
       if (share != null) stat(`Part de ${nameOf(parent)}`, fmtPct(share));
       if (pop != null) stat("Popularité moyenne", String(Math.round(pop)));
-      if (node.kind === "other") stat("Artistes regroupés", fmtN(node.artists));
+      if (node.kind === "subgenre") {
+        stat("Artistes", fmtN(node.children.length));
+        if (node.children.length > CONCENTRATION) {
+          const top = d3.sum(node.children.slice(0, CONCENTRATION), (a) => a.count);
+          stat(`Part des ${CONCENTRATION} premiers`, fmtPct(top / node.count));
+        }
+      }
 
       const color = node.kind === "root" ? null : DataLoader.genreColor(node.genre);
 
-      if (node.children && node.kind !== "other") {
-        const kids = node.children.filter((c) => c.kind !== "other")
+      if (node.children && node.children.length) {
+        const kids = node.children.slice()
           .sort((a, b) => b.count - a.count)
           .slice(0, 8);
         el("h3", null, CHILD_LABEL[node.kind], card);
@@ -304,6 +339,7 @@
       const previous = state.focusPath;
       state.focusPath = path;
       state.selectedPath = null;
+      state.limit = ARTIST_STEP;
       hideTip();
       renderNav();
       renderCard();
@@ -316,7 +352,7 @@
 
     function renderNav() {
       nav.innerHTML = "";
-      const up = el("button", "tm-up", "↑", nav);
+      const up = el("button", "tm-up", "↑ Remonter", nav);
       up.type = "button";
       up.title = "Remonter d'un niveau (Échap)";
       up.setAttribute("aria-label", "Remonter d'un niveau");
@@ -348,14 +384,16 @@
         return render();
       }
       if (!focus.count) {
-        svg.selectAll("*").remove();
+        svg.selectAll("g.tm-layer").remove();
+        tailBar.hidden = true;
         showStatus("Aucun titre ne correspond aux filtres.");
         return;
       }
       status.hidden = true;
 
-      const tree = layout(focus, width, height, state.sizeBy);
+      const tree = layout(displayTree(focus, state.limit), width, height, state.sizeBy);
       currentTree = tree;
+      renderTail(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);
 
       const old = svg.select("g.tm-layer");
@@ -401,6 +439,65 @@
       });
     }
 
+    function renderTail(focus) {
+      tailBar.innerHTML = "";
+      const artists = focus.kind === "subgenre" ? focus.children : [];
+      const shown = artists.slice(0, state.limit);
+      const rest = artists.slice(state.limit);
+      tailBar.hidden = rest.length === 0;
+      if (!rest.length) return;
+
+      const shownCount = d3.sum(shown, (a) => a.count);
+      const restCount = d3.sum(rest, (a) => a.count);
+      const range = titlesRange(d3.min(rest, (a) => a.count), d3.max(rest, (a) => a.count));
+      const text = el("p", "tm-tail-text", null, tailBar);
+      el("strong", null, `${shown.length} artistes affichés sur ${fmtN(artists.length)}`, text);
+      el("span", null, `, soit ${fmtPct(shownCount / focus.count)} des titres du sous-genre. ` +
+        `La taille des rectangles est calculée entre ces ${shown.length} artistes. ` +
+        `Les ${fmtN(rest.length)} autres ont ${range} chacun (${fmtN(restCount)} titres).`, text);
+
+      const actions = el("div", "tm-tail-actions", null, tailBar);
+      const showMore = (limit) => {
+        state.limit = limit;
+        hideTip();
+        render();
+      };
+      const more = el("button", "tm-more", `Afficher ${Math.min(ARTIST_STEP, rest.length)} de plus`, actions);
+      more.type = "button";
+      more.addEventListener("click", () => showMore(state.limit + ARTIST_STEP));
+      const all = el("button", "tm-more", `Tout afficher (${fmtN(artists.length)})`, actions);
+      all.type = "button";
+      all.addEventListener("click", () => showMore(Infinity));
+    }
+
+    function activate(d) {
+      if (isZoomable(d)) zoomTo(pathOf(d), box(d));
+      else select(pathOf(d));
+    }
+
+    function summaryRows(d) {
+      const s = d.data.summary;
+      if (!s || widthOf(d) < 110) return [];
+      const rows = [
+        { key: "meta", type: "meta", order: 0, priority: 0, text: `${fmtPct(s.share)} du genre · ${fmtN(s.artists)} artistes` },
+        ...s.top.map((a, i) => ({
+          key: `artist-${i}`, type: "artist", order: 1 + i, priority: i < 3 ? 1 + i : 6 + i,
+          text: a.name, value: fmtN(a.count),
+        })),
+        { key: "hint", type: "hint", order: 9, priority: 4, text: `Explorer les ${fmtN(s.artists)} artistes →` },
+      ];
+      if (s.concentration != null) {
+        rows.push({ key: "top", type: "meta", order: 8, priority: 5,
+          text: `${CONCENTRATION} premiers : ${fmtPct(s.concentration)} des titres` });
+      }
+      const max = Math.max(0, Math.floor((heightOf(d) - 36) / 18));
+      return rows
+        .sort((a, b) => a.priority - b.priority)
+        .slice(0, max)
+        .sort((a, b) => a.order - b.order)
+        .map((r, i) => ({ ...r, i }));
+    }
+
     function draw(layer, tree) {
       const groups = layer.selectAll("g.tm-group")
         .data(tree.children || [], keyOf)
@@ -414,22 +511,43 @@
         .classed("is-leaf", (d) => !d.children)
         .on("mousemove", showTip)
         .on("mouseleave", hideTip)
-        .on("click", (event, d) => {
-          if (isZoomable(d)) zoomTo(pathOf(d), box(d));
-          else select(pathOf(d));
-        });
+        .on("click", (event, d) => activate(d));
 
       groups.select(".tm-frame")
         .call(placeRect, 4)
         .attr("fill", fillOf)
-        .attr("fill-opacity", (d) => (d.children ? 0.22 : 1))
-        .classed("is-other", isOther);
+        .attr("fill-opacity", (d) => (d.children ? 0.22 : 1));
+
+      groups.classed("has-summary", (d) => Boolean(d.data.summary));
 
       groups.select(".tm-group-label")
-        .attr("x", (d) => d.x0 + 6)
-        .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : 16))
-        .attr("fill", (d) => (d.children ? "var(--text)" : textOn(fillOf(d))))
+        .attr("x", (d) => d.x0 + (d.data.summary ? 8 : 6))
+        .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : d.data.summary ? 22 : 16))
+        .attr("fill", (d) => (d.children ? "var(--text)" : labelFill(d)))
         .text((d) => truncate(`${labelOf(d)} · ${fmtN(d.value)}`, Math.floor((widthOf(d) - 12) / 7)));
+
+      groups.each(function (d) {
+        const rows = summaryRows(d);
+        const color = labelFill(d);
+        const y = (r) => d.y0 + 44 + r.i * 18;
+        const g = d3.select(this);
+        g.selectAll("text.tm-row")
+          .data(rows, (r) => r.key)
+          .join("text")
+          .attr("class", (r) => `tm-row is-${r.type}`)
+          .attr("x", d.x0 + 8)
+          .attr("y", y)
+          .attr("fill", color)
+          .text((r) => truncate(r.text, Math.floor((widthOf(d) - (r.value ? 56 : 16)) / 6.6)));
+        g.selectAll("text.tm-row-value")
+          .data(rows.filter((r) => r.value), (r) => r.key)
+          .join("text")
+          .attr("class", "tm-row-value")
+          .attr("x", d.x1 - 8)
+          .attr("y", y)
+          .attr("fill", color)
+          .text((r) => r.value);
+      });
 
       groups.each(function (parent) {
         const cells = d3.select(this).selectAll("g.tm-cell")
@@ -448,23 +566,21 @@
           })
           .on("click", (event, d) => {
             event.stopPropagation();
-            if (isZoomable(d)) zoomTo(pathOf(d), box(d));
-            else select(pathOf(d));
+            activate(d);
           });
 
         cells.select("rect")
           .call(placeRect, 2)
-          .attr("fill", fillOf)
-          .classed("is-other", isOther);
+          .attr("fill", fillOf);
 
         cells.select(".tm-name")
           .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 15)
-          .attr("fill", (d) => textOn(fillOf(d)))
+          .attr("fill", labelFill)
           .text((d) => (heightOf(d) >= 20 ? truncate(labelOf(d), Math.floor((widthOf(d) - 10) / 7)) : ""));
 
         cells.select(".tm-count")
           .attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 29)
-          .attr("fill", (d) => textOn(fillOf(d)))
+          .attr("fill", labelFill)
           .text((d) => (heightOf(d) >= 36 && widthOf(d) >= 60 ? `${fmtN(d.value)} titres` : ""));
       });
     }

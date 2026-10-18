@@ -17,6 +17,9 @@
 (function () {
   "use strict";
 
+  /* ---------------- constantes ---------------- */
+  const TOP_ARTISTS = 60;   // artistes gardés par sous-genre, le reste → « Autres »
+
   /* ---------------- helpers DOM ---------------- */
   function el(tag, cls, text, parent) {
     const n = document.createElement(tag);
@@ -26,6 +29,67 @@
     return n;
   }
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " "); // 28 356
+
+  /* ============================================================
+     PRÉPARATION  (données dérivées → arbre prêt à dessiner)
+     ------------------------------------------------------------
+     Entrée : hierarchy.json, chaque artiste porte
+              dec = { "2010": [nb titres, somme popularités], ... }
+     Sortie : un arbre où chaque nœud a
+              count  nb de titres retenus (→ aire)
+              popSum somme des popularités  (→ popularité moyenne = popSum / count)
+              kind   "root" | "genre" | "subgenre" | "artist" | "other"
+     Règles :
+       1. on ne garde que les décennies choisies (aucune = toutes) ;
+       2. on écarte les artistes dont la popularité moyenne < minPopularity ;
+       3. par sous-genre, on garde les TOP_ARTISTS plus gros artistes et on
+          regroupe le reste dans un nœud « Autres » (sinon des milliers de
+          rectangles illisibles : 10 148 artistes n'ont qu'un seul titre).
+     Fonction pure : ne lit que ses arguments, ne modifie pas raw.
+     ============================================================ */
+  function aggregateArtist(artist, decades) {
+    let count = 0, popSum = 0;
+    for (const [dec, [n, pop]] of Object.entries(artist.dec || {})) {
+      if (decades.size && !decades.has(+dec)) continue;
+      count += n; popSum += pop;
+    }
+    // ancien format (sans « dec ») : pas de filtre possible, pas de popularité
+    if (!artist.dec) count = artist.value || 0;
+    return { name: artist.name, kind: "artist", count, popSum };
+  }
+
+  function prepare(raw, { decades = new Set(), minPopularity = 0, topN = TOP_ARTISTS } = {}) {
+    const sumUp = (node) => {
+      node.count = d3.sum(node.children, (c) => c.count);
+      node.popSum = d3.sum(node.children, (c) => c.popSum);
+      return node;
+    };
+
+    const genres = raw.children.map((g) => {
+      const subgenres = g.children.map((s) => {
+        const artists = s.children
+          .map((a) => aggregateArtist(a, decades))
+          .filter((a) => a.count > 0 && a.popSum / a.count >= minPopularity)
+          .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
+
+        const kept = artists.slice(0, topN);
+        const rest = artists.slice(topN);
+        if (rest.length) {
+          kept.push({
+            name: `Autres (${rest.length} artistes)`, kind: "other", artists: rest.length,
+            count: d3.sum(rest, (a) => a.count), popSum: d3.sum(rest, (a) => a.popSum),
+          });
+        }
+        return sumUp({ name: s.name, kind: "subgenre", genre: g.name, children: kept });
+      }).filter((s) => s.count > 0);
+      return sumUp({ name: g.name, kind: "genre", genre: g.name, children: subgenres });
+    }).filter((g) => g.count > 0);
+
+    return sumUp({ name: "Catalogue", kind: "root", children: genres });
+  }
+
+  /* popularité moyenne d'un nœud préparé (null si vide) */
+  const popMean = (d) => (d.count ? d.popSum / d.count : null);
 
   function mount(container) {
     /* ---------- état unique de la vue ----------
@@ -63,15 +127,22 @@
     status.setAttribute("role", "status");
     status.textContent = "Chargement des données…";
 
+    /* ---------- cycle de mise à jour : état → préparation → (placement → rendu) ---------- */
+    function update() {
+      const tree = prepare(state.raw, state);
+      const subgenres = d3.sum(tree.children, (g) => g.children.length);
+      console.log(`[treemap] ${tree.children.length} genres, ${subgenres} sous-genres, ` +
+        `${tree.count} titres, popularité moyenne ${popMean(tree).toFixed(1)}`);
+      status.textContent = `${tree.children.length} genres · ${subgenres} sous-genres · ` +
+        `${fmtN(tree.count)} titres · popularité moyenne ${popMean(tree).toFixed(0)}`;
+      return tree;   // étape 2 : layout(tree) puis render()
+    }
+
     /* ---------- chargement ---------- */
     DataLoader.hierarchy()
       .then((raw) => {
         state.raw = raw;
-        const h = d3.hierarchy(raw).sum((d) => d.value || 0);
-        const genres = h.children.length;
-        const subgenres = h.children.reduce((s, g) => s + g.children.length, 0);
-        console.log(`[treemap] ${genres} genres, ${subgenres} sous-genres, ${h.value} titres`);
-        status.textContent = `${genres} genres · ${subgenres} sous-genres · ${fmtN(h.value)} titres chargés`;
+        update();
       })
       .catch((err) => {
         console.error("[treemap]", err);
@@ -83,8 +154,8 @@
         el("span", null, "puis ouvrez localhost:8000/treemap.html", status);
       });
 
-    return { state };
+    return { state, update };
   }
 
-  window.TreemapView = { mount };
+  window.TreemapView = { mount, prepare, popMean };
 })();

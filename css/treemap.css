@@ -135,6 +135,9 @@ button.tm-bar:hover { background: var(--frame); }
 .tm-group.is-zoomable .tm-frame, .tm-cell.is-zoomable { cursor: pointer; }
 .tm-cell.is-zoomable:hover rect,
 .tm-group.is-leaf > .tm-frame { cursor: pointer; }
+.tm-svg g:focus { outline: none; }
+.tm-group:focus-visible > .tm-frame,
+.tm-cell:focus-visible > rect { stroke: var(--accent); stroke-width: 3; }
 .tm-group.is-leaf:hover > .tm-frame { stroke: var(--text); stroke-width: 2; }
 .tm-group.is-zoomable:not(.is-leaf):hover > .tm-frame { stroke: var(--text-3); stroke-width: 1.5; }
 

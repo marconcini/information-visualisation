@@ -260,7 +260,7 @@
 
     const svg = d3.select(scene).append("svg")
       .attr("class", "tm-svg")
-      .attr("role", "img")
+      .attr("role", "group")
       .attr("aria-label", "Treemap du catalogue Spotify");
     const status = el("div", "tm-status", "Chargement des données…", scene);
     status.setAttribute("role", "status");
@@ -306,9 +306,17 @@
     }
 
     function showTip(event, d) {
+      if (fillTip(d, "Cliquer")) placeTip(...d3.pointer(event, scene));
+    }
+
+    function showTipFor(d) {
+      if (fillTip(d, "Entrée")) placeTip(d.x0 + 12, d.y0 + 28);
+    }
+
+    function fillTip(d, action) {
       tip.innerHTML = "";
       const info = stats(pathOf(d));
-      if (!info) return;
+      if (!info) return false;
       const { node, parent, share, pop } = info;
       const head = el("div", "tm-tip-title", nameOf(node), tip);
       el("span", "tm-tip-kind", ` · ${KIND_LABEL[node.kind]}`, head);
@@ -316,13 +324,12 @@
       if (share != null) parts.push(`${fmtPct(share)} de ${nameOf(parent)}`);
       el("div", null, parts.join(" · "), tip);
       if (pop != null) el("div", null, `Popularité moyenne des titres : ${Math.round(pop)}`, tip);
-      el("div", "tm-tip-hint", isZoomable(d) ? "Cliquer pour explorer" : "Cliquer pour le détail", tip);
-      placeTip(event);
+      el("div", "tm-tip-hint", `${action} pour ${isZoomable(d) ? "explorer" : "le détail"}`, tip);
+      return true;
     }
 
-    function placeTip(event) {
+    function placeTip(x, y) {
       tip.hidden = false;
-      const [x, y] = d3.pointer(event, scene);
       const { clientWidth: w, clientHeight: h } = scene;
       const left = x + 14 + tip.offsetWidth > w ? x - 14 - tip.offsetWidth : x + 14;
       const top = y + 14 + tip.offsetHeight > h ? y - 14 - tip.offsetHeight : y + 14;
@@ -439,6 +446,8 @@
     function zoomTo(path, from) {
       if (busy || samePath(path, state.focusPath)) return;
       const start = from || rectFor(path) || { x: 0, y: 0, w: scene.clientWidth, h: scene.clientHeight };
+      const active = document.activeElement;
+      const keyboard = Boolean(active && root.contains(active) && active.matches(":focus-visible"));
       const previous = state.focusPath;
       state.focusPath = path;
       state.selectedPath = null;
@@ -446,7 +455,7 @@
       hideTip();
       renderNav();
       renderCard();
-      render(path.length > previous.length ? { dir: "in", from: start } : { dir: "out", previous });
+      render(path.length > previous.length ? { dir: "in", from: start, keyboard } : { dir: "out", previous, keyboard });
     }
 
     function zoomOut() {
@@ -541,6 +550,7 @@
         if (destroyed) return;
         busy = false;
         layer.attr("transform", null);
+        if (anim.keyboard) restoreFocus(layer, anim);
         if (renderPending) {
           renderPending = false;
           render();
@@ -613,6 +623,41 @@
         .map((r, i) => ({ ...r, i }));
     }
 
+    function restoreFocus(layer, anim) {
+      const items = layer.selectAll("g.tm-group, g.tm-cell");
+      let target = null;
+      if (anim.dir === "out") {
+        const back = anim.previous.slice(0, state.focusPath.length + 2);
+        target = items.filter((d) => samePath(pathOf(d), back)).node()
+          || items.filter((d) => samePath(pathOf(d), back.slice(0, -1))).node();
+      }
+      target = target || items.node();
+      if (target) target.focus({ preventScroll: true });
+    }
+
+    function ariaLabel(d) {
+      const kind = KIND_LABEL[d.data.kind];
+      const action = isZoomable(d) ? "Entrée pour explorer" : "Entrée pour le détail";
+      return `${labelOf(d)}, ${kind}, ${fmtN(d.value)} titres. ${action}.`;
+    }
+
+    function makeAccessible(selection) {
+      selection
+        .attr("tabindex", 0)
+        .attr("role", "button")
+        .attr("aria-label", ariaLabel)
+        .on("keydown", (event, d) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          event.stopPropagation();
+          activate(d);
+        })
+        .on("focus", function (event, d) {
+          if (this.matches(":focus-visible")) showTipFor(d);
+        })
+        .on("blur", hideTip);
+    }
+
     function draw(layer, tree) {
       const groups = layer.selectAll("g.tm-group")
         .data(tree.children || [], keyOf)
@@ -626,7 +671,8 @@
         .classed("is-leaf", (d) => !d.children)
         .on("mousemove", showTip)
         .on("mouseleave", hideTip)
-        .on("click", (event, d) => activate(d));
+        .on("click", (event, d) => activate(d))
+        .call(makeAccessible);
 
       groups.select(".tm-frame")
         .call(placeRect, 4)
@@ -681,7 +727,8 @@
           .on("click", (event, d) => {
             event.stopPropagation();
             activate(d);
-          });
+          })
+          .call(makeAccessible);
 
         cells.select("rect")
           .call(placeRect, 2)

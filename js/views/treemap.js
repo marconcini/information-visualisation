@@ -450,15 +450,21 @@
     function renderTail(focus) {
       tailBar.innerHTML = "";
       const artists = focus.kind === "subgenre" ? focus.children : [];
+      tailBar.hidden = artists.length === 0;
+      if (!artists.length) return;
+
       const shown = artists.slice(0, state.limit);
       const rest = artists.slice(state.limit);
-      tailBar.hidden = rest.length === 0;
-      if (!rest.length) return;
+      const text = el("p", "tm-tail-text", null, tailBar);
+      if (!rest.length) {
+        el("strong", null, `${fmtN(artists.length)} artistes affichés`, text);
+        el("span", null, ". L'aire de chaque rectangle correspond à son nombre de titres.", text);
+        return;
+      }
 
       const shownCount = d3.sum(shown, (a) => a.count);
       const restCount = d3.sum(rest, (a) => a.count);
       const range = titlesRange(d3.min(rest, (a) => a.count), d3.max(rest, (a) => a.count));
-      const text = el("p", "tm-tail-text", null, tailBar);
       el("strong", null, `${shown.length} artistes affichés sur ${fmtN(artists.length)}`, text);
       el("span", null, `, soit ${fmtPct(shownCount / focus.count)} des titres du sous-genre. ` +
         `La taille des rectangles est calculée entre ces ${shown.length} artistes. ` +

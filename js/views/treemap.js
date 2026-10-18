@@ -210,7 +210,7 @@
     }
 
     const tint = (hue, amount) => d3.interpolateRgb(theme.surface, hue)(amount);
-    const genreTint = (g, isGroup) => tint(DataLoader.genreColor(g), isGroup ? 0.18 : theme.dark ? 0.55 : 0.42);
+    const genreTint = (g, isGroup) => tint(DataLoader.genreColor(g), isGroup ? 0.22 : theme.dark ? 0.62 : 0.52);
 
     function paint(d) {
       if (!byPopularity()) return genreTint(d.data.genre || d.data.name, Boolean(d.children));
@@ -236,6 +236,8 @@
 
     function renderLegend() {
       legend.innerHTML = "";
+      el("span", "tm-legend-key", "Aire : nombre de titres", legend);
+      el("span", "tm-legend-key", "Couleur :", legend);
       if (byPopularity() && popScale) {
         const [lo, hi] = popScale.domain();
         el("span", null, `Popularité moyenne des titres, ${LEVEL_LABEL[popLevel] || ""}`, legend);
@@ -536,6 +538,7 @@
         .attr("opacity", 0)
         .remove();
       t.end().catch(() => {}).then(() => {
+        if (destroyed) return;
         busy = false;
         layer.attr("transform", null);
         if (renderPending) {
@@ -717,19 +720,27 @@
       status.hidden = false;
       status.classList.add("is-error");
       status.innerHTML = "";
-      el("strong", null, "Impossible de charger les données.", status);
-      el("span", null, "Vérifiez que data/derived/hierarchy.json existe et que la page est servie par un serveur local.", status);
+      el("strong", null, "Impossible de charger ou de préparer les données.", status);
+      el("span", null, "Le détail de l'erreur est dans la console du navigateur.", status);
     }
 
-    DataLoader.hierarchy().then((raw) => {
-      state.raw = raw;
-      update();
-    }, showLoadError);
+    let destroyed = false;
+    DataLoader.hierarchy()
+      .then((raw) => {
+        if (destroyed) return;
+        state.raw = raw;
+        update();
+      })
+      .catch((err) => {
+        if (!destroyed) showLoadError(err);
+      });
 
     function destroy() {
+      destroyed = true;
       observer.disconnect();
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeydown);
+      svg.interrupt();
       svg.selectAll("*").interrupt();
       container.innerHTML = "";
     }

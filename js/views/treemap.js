@@ -165,7 +165,24 @@
     return root;
   }
 
-  const textOn = (fill) => (d3.lab(fill).l > 62 ? "#0b0b0b" : "#ffffff");
+  const DARK_TEXT = "#0b0b0b";
+  const LIGHT_TEXT = "#ffffff";
+
+  function luminance(color) {
+    const { r, g, b } = d3.rgb(color);
+    const channel = (v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  }
+
+  function contrastRatio(a, b) {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  const textOn = (fill) => (contrastRatio(fill, DARK_TEXT) >= contrastRatio(fill, LIGHT_TEXT) ? DARK_TEXT : LIGHT_TEXT);
   const titlesRange = (min, max) => (min === max ? `${min} titre${min > 1 ? "s" : ""}` : `${min} à ${max} titres`);
   const labelOf = (d) => (d.data.kind === "genre" && DataLoader.GENRE_LABELS[d.data.name]) || d.data.name;
   const widthOf = (d) => Math.max(0, d.x1 - d.x0);
@@ -453,7 +470,7 @@
 
     function highlight() {
       const key = state.selectedPath ? state.selectedPath.join(SEP) : null;
-      svg.selectAll("g.tm-group, g.tm-cell").classed("is-selected", (d) => key !== null && keyOf(d) === key);
+      svg.selectAll("g.tm-head, g.tm-cell").classed("is-selected", (d) => key !== null && keyOf(d) === key);
     }
 
     function rectFor(path) {
@@ -641,7 +658,8 @@
         .attr("transform", zoomIn ? fit(target) : expand(target))
         .attr("opacity", zoomIn ? 1 : 0);
       if (!zoomIn) old.raise();
-      old.attr("pointer-events", "none");
+      old.attr("pointer-events", "none").attr("aria-hidden", "true");
+      old.selectAll("[tabindex]").attr("tabindex", null);
 
       const t = svg.transition().duration(duration).ease(d3.easeCubicInOut);
       layer.transition(t).attr("transform", identity).attr("opacity", 1);
@@ -727,7 +745,7 @@
     }
 
     function restoreFocus(layer, anim) {
-      const items = layer.selectAll("g.tm-group, g.tm-cell");
+      const items = layer.selectAll("g.tm-head, g.tm-cell");
       let target = null;
       if (anim.dir === "out") {
         const back = anim.previous.slice(0, state.focusPath.length + 2);
@@ -767,12 +785,17 @@
         .data(tree.children || [], keyOf)
         .join((enter) => {
           const g = enter.append("g").attr("class", "tm-group");
-          g.append("rect").attr("class", "tm-frame");
-          g.append("text").attr("class", "tm-group-label");
+          const head = g.append("g").attr("class", "tm-head");
+          head.append("rect").attr("class", "tm-frame");
+          head.append("text").attr("class", "tm-group-label");
           return g;
         })
         .classed("is-zoomable", isZoomable)
         .classed("is-leaf", (d) => !d.children)
+        .attr("role", (d) => (d.children ? "group" : null))
+        .attr("aria-label", (d) => (d.children ? labelOf(d) : null));
+
+      groups.select(".tm-head")
         .on("mousemove", showTip)
         .on("mouseleave", hideTip)
         .on("click", (event, d) => activate(d))

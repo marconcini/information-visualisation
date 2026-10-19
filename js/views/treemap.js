@@ -54,16 +54,23 @@
 
   const UNKNOWN_ARTIST = "(artiste inconnu)";
 
+  const toNumber = (value) => (value == null || String(value).trim() === "" ? NaN : +value);
+
   function parseTrack(row) {
+    const popularity = toNumber(row.popularity);
+    const decade = toNumber(row.decade);
+    if (!row.genre || !row.subgenre) return null;
+    if (!Number.isFinite(popularity) || popularity < 0 || popularity > 100) return null;
+    if (!Number.isFinite(decade)) return null;
     return {
       id: row.track_id,
       name: row.track_name,
       artist: row.artist || UNKNOWN_ARTIST,
       genre: row.genre,
       subgenre: row.subgenre,
-      popularity: +row.popularity,
-      year: +row.year,
-      decade: +row.decade,
+      popularity,
+      year: toNumber(row.year),
+      decade,
       row,
     };
   }
@@ -220,6 +227,7 @@
     let currentTree = null;
     let busy = false;
     let renderPending = false;
+    let updatePending = false;
 
     function requestRender(smooth = false) {
       if (busy) {
@@ -232,7 +240,10 @@
     container.innerHTML = "";
     const root = el("div", "tm-root", null, container);
     const filters = el("div", "tm-filters", null, root);
-    const nav = el("nav", "tm-nav", null, root);
+    const navRow = el("div", "tm-navrow", null, root);
+    const nav = el("nav", "tm-nav", null, navRow);
+    const summary = el("div", "tm-summary", null, navRow);
+    summary.setAttribute("aria-live", "polite");
     const scene = el("div", "tm-scene", null, root);
     const tailBar = el("div", "tm-tail", null, root);
     const aside = el("aside", "tm-aside", null, root);
@@ -286,6 +297,13 @@
 
     function decadeCounts(raw) {
       const counts = new Map();
+      if (tracks) {
+        for (const t of tracks) {
+          if (t.popularity >= state.minPopularity) counts.set(t.decade, (counts.get(t.decade) || 0) + 1);
+        }
+        for (const [dec] of decadeCounts.all || []) if (!counts.has(dec)) counts.set(dec, 0);
+        return [...counts].sort(([a], [b]) => a - b);
+      }
       for (const g of raw.children) {
         for (const s of g.children) {
           for (const a of s.children) {
@@ -293,7 +311,22 @@
           }
         }
       }
-      return [...counts].sort(([a], [b]) => a - b);
+      decadeCounts.all = [...counts].sort(([a], [b]) => a - b);
+      return decadeCounts.all;
+    }
+
+    function chipLabel(chip, dec, count) {
+      chip.title = `Années ${dec} : ${fmtN(count)} titres`;
+      chip.setAttribute("aria-label", `Années ${dec}, ${fmtN(count)} titres`);
+      chip.classList.toggle("is-empty", count === 0);
+    }
+
+    function updateChipCounts() {
+      const counts = new Map(decadeCounts(state.raw));
+      chips.querySelectorAll("[data-decade]").forEach((chip) => {
+        const dec = +chip.dataset.decade;
+        chipLabel(chip, dec, counts.get(dec) || 0);
+      });
     }
 
     function renderChips() {
@@ -306,8 +339,8 @@
       for (const [dec, count] of decadeCounts(state.raw)) {
         const chip = el("button", "tm-chip", String(dec), chips);
         chip.type = "button";
-        chip.title = `Années ${dec} : ${fmtN(count)} titres`;
-        chip.setAttribute("aria-label", `Années ${dec}, ${fmtN(count)} titres`);
+        chip.dataset.decade = dec;
+        chipLabel(chip, dec, count);
         chip.setAttribute("aria-pressed", String(state.decades.has(dec)));
         chip.addEventListener("click", () => {
           const next = new Set(state.decades);
@@ -399,6 +432,10 @@
 
     function update(smooth = false) {
       if (!state.raw) return;
+      if (busy) {
+        updatePending = true;
+        return;
+      }
       prepared = tracks ? prepareFromTracks(tracks, state) : prepare(state.raw, state);
 
       while (state.focusPath.length && !findByPath(prepared, state.focusPath)) {
@@ -410,8 +447,34 @@
 
       hideTip();
       renderNav();
+      renderSummary();
+      updateChipCounts();
       requestRender(smooth);
       renderCard();
+    }
+
+    const filtersActive = () => state.decades.size > 0 || state.minPopularity > 0;
+
+    function renderSummary() {
+      summary.innerHTML = "";
+      if (!filtersActive()) return;
+      const total = state.raw ? prepare(state.raw).count : 0;
+      const parts = [];
+      if (state.decades.size) parts.push(`années ${[...state.decades].sort((a, b) => a - b).join(", ")}`);
+      if (state.minPopularity > 0) parts.push(`popularité ≥ ${state.minPopularity}`);
+      el("span", "tm-summary-text", `${fmtN(prepared.count)} titres retenus sur ${fmtN(total)} · ${parts.join(" · ")}`, summary);
+      const reset = el("button", "tm-more", "Réinitialiser les filtres", summary);
+      reset.type = "button";
+      reset.addEventListener("click", resetFilters);
+    }
+
+    function resetFilters() {
+      state.decades = new Set();
+      state.minPopularity = 0;
+      popInput.value = 0;
+      if (!popInput.disabled) popValue.textContent = "0";
+      renderChips();
+      update(true);
     }
 
     function stats(path) {
@@ -672,7 +735,11 @@
         busy = false;
         layer.attr("transform", null);
         if (anim.keyboard) restoreFocus(layer, anim);
-        if (renderPending) {
+        if (updatePending) {
+          updatePending = false;
+          renderPending = false;
+          update(true);
+        } else if (renderPending) {
           renderPending = false;
           render();
         }
@@ -780,7 +847,7 @@
     }
 
     function draw(layer, tree, smooth) {
-      const move = (sel) => (smooth ? sel.transition().duration(450).ease(d3.easeCubicOut) : sel);
+      const move = (sel) => (smooth && !reducedMotion() ? sel.transition().duration(450).ease(d3.easeCubicOut) : sel);
       const groups = layer.selectAll("g.tm-group")
         .data(tree.children || [], keyOf)
         .join((enter) => {
@@ -916,7 +983,8 @@
       DataLoader.tracksClean()
         .then((rows) => {
           if (destroyed) return;
-          tracks = rows.map(parseTrack);
+          tracks = rows.map(parseTrack).filter(Boolean);
+          if (tracks.length < rows.length) console.warn(`${rows.length - tracks.length} lignes ignorées (valeurs manquantes ou invalides)`);
           popInput.disabled = false;
           popValue.textContent = String(state.minPopularity);
           update();
@@ -927,8 +995,16 @@
         });
     }
 
+    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const onThemeChange = () => requestRender();
+    darkQuery.addEventListener("change", onThemeChange);
+    const themeObserver = new MutationObserver(onThemeChange);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
     function destroy() {
       destroyed = true;
+      darkQuery.removeEventListener("change", onThemeChange);
+      themeObserver.disconnect();
       observer.disconnect();
       cancelAnimationFrame(frame);
       cancelAnimationFrame(popFrame);

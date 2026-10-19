@@ -8,6 +8,7 @@
   const BLUE_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
     "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
   const LEVEL_LABEL = { subgenre: "par sous-genre", artist: "par artiste" };
+  const MIN_SPAN = 10;
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
@@ -49,6 +50,55 @@
       return sumUp({ name: g.name, kind: "genre", genre: g.name, children: subgenres });
     }).filter((g) => g.count > 0);
 
+    return sumUp({ name: "Catalogue", kind: "root", children: genres });
+  }
+
+  const UNKNOWN_ARTIST = "(artiste inconnu)";
+
+  function parseTrack(row) {
+    return {
+      id: row.track_id,
+      name: row.track_name,
+      artist: row.artist || UNKNOWN_ARTIST,
+      genre: row.genre,
+      subgenre: row.subgenre,
+      popularity: +row.popularity,
+      year: +row.year,
+      decade: +row.decade,
+      row,
+    };
+  }
+
+  function artistFromTracks(name, genre, tracks) {
+    const dec = {};
+    for (const t of tracks) {
+      const entry = dec[t.decade] || (dec[t.decade] = [0, 0]);
+      entry[0] += 1;
+      entry[1] += t.popularity;
+    }
+    return {
+      name,
+      kind: "artist",
+      genre,
+      count: tracks.length,
+      popSum: d3.sum(tracks, (t) => t.popularity),
+      dec,
+      tracks,
+    };
+  }
+
+  function prepareFromTracks(tracks, { decades = new Set(), minPopularity = 0 } = {}) {
+    const kept = tracks.filter((t) => (!decades.size || decades.has(t.decade)) && t.popularity >= minPopularity);
+    const grouped = d3.group(kept, (t) => t.genre, (t) => t.subgenre, (t) => t.artist);
+    const genres = [...grouped].map(([genre, subs]) => {
+      const subgenres = [...subs].map(([subgenre, artists]) => {
+        const children = [...artists]
+          .map(([name, list]) => artistFromTracks(name, genre, list))
+          .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
+        return sumUp({ name: subgenre, kind: "subgenre", genre, children });
+      });
+      return sumUp({ name: genre, kind: "genre", genre, children: subgenres });
+    });
     return sumUp({ name: "Catalogue", kind: "root", children: genres });
   }
 
@@ -144,11 +194,13 @@
       raw: null,
       focusPath: [],
       decades: new Set(),
+      minPopularity: 0,
       selectedPath: null,
       limit: ARTIST_STEP,
       colorBy: "genre",
     };
     let prepared = null;
+    let tracks = null;
     let currentTree = null;
     let busy = false;
     let renderPending = false;
@@ -193,6 +245,27 @@
     const chips = el("div", "tm-chips", null, decadeControl);
     chips.setAttribute("role", "group");
     chips.setAttribute("aria-label", "Filtrer par décennie");
+    const popControl = el("div", "tm-control", null, filters);
+    const popLabel = el("label", "tm-control-label", "Popularité min. des titres", popControl);
+    const popInput = el("input", "tm-range", null, popControl);
+    popInput.type = "range";
+    popInput.min = 0;
+    popInput.max = 100;
+    popInput.step = 5;
+    popInput.value = 0;
+    popInput.id = `tm-pop-${Math.random().toString(36).slice(2, 8)}`;
+    popLabel.htmlFor = popInput.id;
+    popInput.disabled = true;
+    const popValue = el("output", "tm-range-value", "chargement des titres…", popControl);
+
+    let popFrame = 0;
+    popInput.addEventListener("input", () => {
+      state.minPopularity = +popInput.value;
+      popValue.textContent = String(state.minPopularity);
+      cancelAnimationFrame(popFrame);
+      popFrame = requestAnimationFrame(() => update(true));
+    });
+
     const legend = el("div", "tm-legend", null, filters);
 
     function decadeCounts(raw) {
@@ -277,7 +350,11 @@
         (n.children || []).forEach(walk);
       })(prepared);
       let [lo, hi] = values.length ? d3.extent(values) : [0, 100];
-      if (Math.round(lo) === Math.round(hi)) [lo, hi] = [lo - 1, hi + 1];
+      if (hi - lo < MIN_SPAN) {
+        const mid = (lo + hi) / 2;
+        lo = Math.max(0, Math.min(mid - MIN_SPAN / 2, 100 - MIN_SPAN));
+        hi = lo + MIN_SPAN;
+      }
       return [lo, hi];
     }
 
@@ -288,10 +365,11 @@
       if (byPopularity() && popScale) {
         const [lo, hi] = popScale.domain();
         el("span", null, `Popularité moyenne des titres, ${LEVEL_LABEL[popLevel] || ""}`, legend);
-        el("span", "tm-legend-value", String(Math.round(lo)), legend);
-        const ramp = el("span", "tm-ramp", null, legend);
+        const scale = el("span", "tm-scale", null, legend);
+        el("span", "tm-legend-value", String(Math.round(lo)), scale);
+        const ramp = el("span", "tm-ramp", null, scale);
         ramp.style.background = `linear-gradient(to right, ${d3.range(0, 1.01, 0.1).map((t) => popScale.interpolator()(t)).join(", ")})`;
-        el("span", "tm-legend-value", String(Math.round(hi)), legend);
+        el("span", "tm-legend-value", String(Math.round(hi)), scale);
         return;
       }
       DataLoader.GENRES.forEach((g) => {
@@ -325,7 +403,7 @@
 
     function update(smooth = false) {
       if (!state.raw) return;
-      prepared = prepare(state.raw, state);
+      prepared = tracks ? prepareFromTracks(tracks, state) : prepare(state.raw, state);
 
       while (state.focusPath.length && !findByPath(prepared, state.focusPath)) {
         state.focusPath = state.focusPath.slice(0, -1);
@@ -827,15 +905,32 @@
         state.raw = raw;
         renderChips();
         update();
+        loadTracks();
       })
       .catch((err) => {
         if (!destroyed) showLoadError(err);
       });
 
+    function loadTracks() {
+      DataLoader.tracksClean()
+        .then((rows) => {
+          if (destroyed) return;
+          tracks = rows.map(parseTrack);
+          popInput.disabled = false;
+          popValue.textContent = String(state.minPopularity);
+          update();
+        })
+        .catch((err) => {
+          console.error(err);
+          if (!destroyed) popValue.textContent = "titres indisponibles";
+        });
+    }
+
     function destroy() {
       destroyed = true;
       observer.disconnect();
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(popFrame);
       document.removeEventListener("keydown", onKeydown);
       svg.interrupt();
       svg.selectAll("*").interrupt();
@@ -845,5 +940,5 @@
     return { state, update, render, zoomTo, destroy };
   }
 
-  window.TreemapView = { mount, prepare, popMean };
+  window.TreemapView = { mount, prepare, prepareFromTracks, parseTrack, popMean };
 })();

@@ -155,6 +155,38 @@ button.tm-bar:hover { background: var(--frame); }
 .tm-svg .tm-head:focus-visible > .tm-frame,
 .tm-svg .tm-cell:focus-visible > rect { stroke: var(--accent); stroke-width: 3; }
 
+.tm-detail { position: absolute; inset: 0; overflow: auto; padding: 18px 22px; background: var(--surface);
+  border-top: 4px solid var(--grid); border-radius: 6px; animation: tm-fade .3s ease .55s both; }
+.tm-detail[hidden] { display: none; }
+@keyframes tm-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tm-detail { animation: none; } }
+.tm-detail-title { margin: 0; font-size: 22px; font-weight: 600; }
+.tm-detail-title:focus { outline: none; }
+.tm-detail-sub { margin: 4px 0 18px; color: var(--text-2); }
+.tm-detail-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 28px; }
+.tm-detail h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.tm-prow { display: grid; grid-template-columns: 170px minmax(0, 1fr) 40px; gap: 10px; align-items: center;
+  margin-bottom: 9px; font-size: 13px; }
+.tm-prow-track { position: relative; height: 10px; border-radius: 5px; background: var(--grid); }
+.tm-prow-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; transition: width .25s ease; }
+.tm-prow-ref { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); }
+.tm-prow-value { text-align: right; font-variant-numeric: tabular-nums; }
+.tm-profile-note { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12px; color: var(--text-2); }
+.tm-note-mark { width: 2px; height: 14px; background: var(--text); }
+.tm-tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tm-track { display: grid; grid-template-columns: minmax(0, 1fr) 42px 90px 28px; gap: 10px; align-items: center;
+  padding: 5px 8px; border-radius: 6px; font-size: 13px; }
+.tm-track:hover, .tm-track:focus-visible { background: var(--surface-2); }
+.tm-track:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.tm-track-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-track-year, .tm-track-pop { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.tm-track-bar { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.tm-track-fill { display: block; height: 100%; }
+@media (max-width: 900px) {
+  .tm-detail-body { grid-template-columns: minmax(0, 1fr); }
+  .tm-prow { grid-template-columns: 120px minmax(0, 1fr) 36px; }
+}
+
 .tm-nav .tm-up { height: 28px; padding: 0 10px; margin-right: 6px; border: 1px solid var(--grid); border-radius: 6px;
   background: var(--surface-2); line-height: 1; }
 .tm-nav .tm-up:disabled { opacity: .4; cursor: default; }

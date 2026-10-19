@@ -8,6 +8,17 @@
   const BLUE_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
     "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
   const POPULARITY_DOMAIN = [0, 100];
+  const FEATURES = [
+    ["danceability", "Dansabilité"],
+    ["energy", "Énergie"],
+    ["valence", "Valence (humeur positive)"],
+    ["acousticness", "Acoustique"],
+    ["speechiness", "Parlé"],
+    ["instrumentalness", "Instrumental"],
+    ["liveness", "Live"],
+  ];
+  const fmt2 = d3.format(".2f");
+  const featureMeans = (tracks) => Object.fromEntries(FEATURES.map(([key]) => [key, d3.mean(tracks, (t) => +t.row[key]) || 0]));
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
@@ -126,7 +137,7 @@
       genre: node.genre,
       count: node.count,
       popSum: node.popSum,
-      zoomable: Boolean(node.children && node.children.length),
+      zoomable: Boolean((node.children && node.children.length) || (node.tracks && node.tracks.length)),
     };
   }
 
@@ -418,6 +429,8 @@
       .attr("aria-label", "Treemap du catalogue Spotify");
     const status = el("div", "tm-status", "Chargement des données…", scene);
     status.setAttribute("role", "status");
+    const detail = el("div", "tm-detail", null, scene);
+    detail.hidden = true;
     const tip = el("div", "tm-tip", null, scene);
     tip.hidden = true;
 
@@ -508,7 +521,7 @@
       if (share != null) parts.push(`${fmtPct(share)} de ${nameOf(parent)}`);
       el("div", null, parts.join(" · "), tip);
       if (pop != null) el("div", null, `Popularité moyenne des titres : ${Math.round(pop)}`, tip);
-      el("div", "tm-tip-hint", `${action} pour ${isZoomable(d) ? "explorer" : "le détail"}`, tip);
+      el("div", "tm-tip-hint", `${action} pour ${actionText(d)}`, tip);
       return true;
     }
 
@@ -694,6 +707,14 @@
       const old = svg.select("g.tm-layer");
       const layer = anim || old.empty() ? svg.append("g").attr("class", "tm-layer") : old;
       draw(layer, tree, smooth && !anim);
+      layer.selectAll("rect.tm-backdrop")
+        .data(focus.kind === "artist" ? [tree] : [])
+        .join("rect")
+        .attr("class", "tm-backdrop")
+        .attr("width", width).attr("height", height).attr("rx", 6)
+        .attr("fill", paint);
+      if (focus.kind === "artist") renderDetail(focus);
+      else detail.hidden = true;
       highlight();
       if (anim && !old.empty()) animate(old, layer, anim, tree, width, height);
       else svg.selectAll("g.tm-layer").filter(function () { return this !== layer.node(); }).remove();
@@ -783,6 +804,71 @@
       all.addEventListener("click", () => showMore(Infinity));
     }
 
+    function renderDetail(artist) {
+      detail.innerHTML = "";
+      detail.hidden = false;
+      detail.style.borderTopColor = DataLoader.genreColor(artist.genre);
+      const sub = findByPath(prepared, state.focusPath.slice(0, -1));
+      const reference = featureMeans(sub.children.flatMap((a) => a.tracks || []));
+      const own = featureMeans(artist.tracks);
+
+      const head = el("header", "tm-detail-head", null, detail);
+      const title = el("h2", "tm-detail-title", artist.name, head);
+      title.tabIndex = -1;
+      el("p", "tm-detail-sub",
+        `${fmtN(artist.count)} titres · popularité moyenne des titres ${Math.round(popMean(artist))} · ${sub.name}`, head);
+
+      const body = el("div", "tm-detail-body", null, detail);
+      const profile = el("section", "tm-profile", null, body);
+      const profileTitle = el("h3", null, null, profile);
+      const rows = el("div", "tm-profile-rows", null, profile);
+      const note = el("p", "tm-profile-note", null, profile);
+      el("span", "tm-note-mark", null, note);
+      el("span", null, `moyenne du sous-genre ${sub.name}`, note);
+
+      function showProfile(values, label) {
+        profileTitle.textContent = label;
+        rows.innerHTML = "";
+        for (const [key, name] of FEATURES) {
+          const row = el("div", "tm-prow", null, rows);
+          el("span", "tm-prow-label", name, row);
+          const track = el("span", "tm-prow-track", null, row);
+          const fill = el("span", "tm-prow-fill", null, track);
+          fill.style.width = `${values[key] * 100}%`;
+          fill.style.background = DataLoader.genreColor(artist.genre);
+          const mark = el("span", "tm-prow-ref", null, track);
+          mark.style.left = `${reference[key] * 100}%`;
+          mark.title = `Moyenne de ${sub.name} : ${fmt2(reference[key])}`;
+          el("span", "tm-prow-value", fmt2(values[key]), row);
+          row.setAttribute("aria-label", `${name} : ${fmt2(values[key])}, moyenne du sous-genre ${fmt2(reference[key])}`);
+        }
+      }
+      const showOwn = () => showProfile(own, "Profil audio moyen de l'artiste");
+      showOwn();
+
+      const list = el("section", "tm-tracklist", null, body);
+      el("h3", null, "Titres, du plus au moins populaire", list);
+      const ol = el("ol", "tm-tracks", null, list);
+      const sorted = artist.tracks.slice().sort((a, b) => b.popularity - a.popularity || d3.ascending(a.name, b.name));
+      for (const t of sorted) {
+        const li = el("li", "tm-track", null, ol);
+        li.tabIndex = 0;
+        li.setAttribute("aria-label", `${t.name}, ${Number.isFinite(t.year) ? t.year : "année inconnue"}, popularité ${t.popularity}`);
+        el("span", "tm-track-name", t.name, li);
+        el("span", "tm-track-year", Number.isFinite(t.year) ? String(t.year) : "", li);
+        const bar = el("span", "tm-track-bar", null, li);
+        const fill = el("span", "tm-track-fill", null, bar);
+        fill.style.width = `${t.popularity}%`;
+        fill.style.background = popScale(t.popularity);
+        el("span", "tm-track-pop", String(t.popularity), li);
+        const showTrack = () => showProfile(featureMeans([t]), `Profil audio de « ${t.name} »`);
+        li.addEventListener("mouseenter", showTrack);
+        li.addEventListener("focus", showTrack);
+        li.addEventListener("mouseleave", showOwn);
+        li.addEventListener("blur", showOwn);
+      }
+    }
+
     function activate(d) {
       if (isZoomable(d)) zoomTo(pathOf(d), box(d));
       else select(pathOf(d));
@@ -819,13 +905,19 @@
         target = items.filter((d) => samePath(pathOf(d), back)).node()
           || items.filter((d) => samePath(pathOf(d), back.slice(0, -1))).node();
       }
+      if (!target && !detail.hidden) target = detail.querySelector(".tm-detail-title");
       target = target || items.node();
       if (target) target.focus({ preventScroll: true });
     }
 
+    function actionText(d) {
+      if (d.data.kind === "artist" && isZoomable(d)) return "voir ses titres";
+      return isZoomable(d) ? "explorer" : "le détail";
+    }
+
     function ariaLabel(d) {
       const kind = KIND_LABEL[d.data.kind];
-      const action = isZoomable(d) ? "Entrée pour explorer" : "Entrée pour le détail";
+      const action = `Entrée pour ${actionText(d)}`;
       return `${labelOf(d)}, ${kind}, ${fmtN(d.value)} titres. ${action}.`;
     }
 

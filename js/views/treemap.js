@@ -7,8 +7,7 @@
   const HEADER = 22;
   const BLUE_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
     "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
-  const LEVEL_LABEL = { subgenre: "par sous-genre", artist: "par artiste" };
-  const MIN_SPAN = 10;
+  const POPULARITY_DOMAIN = [0, 100];
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
@@ -316,7 +315,6 @@
     syncColorButtons();
 
     let popScale = null;
-    let popLevel = null;
     let theme = { dark: false, surface: "#fcfcfb", frame: "#f0efec" };
     const byPopularity = () => state.colorBy === "popularity";
 
@@ -339,32 +337,13 @@
     }
     const ink = (d) => textOn(paint(d));
 
-    function levelExtent(kind) {
-      const values = [];
-      (function walk(n) {
-        if (n.kind === kind) {
-          const v = popMean(n);
-          if (Number.isFinite(v)) values.push(v);
-          return;
-        }
-        (n.children || []).forEach(walk);
-      })(prepared);
-      let [lo, hi] = values.length ? d3.extent(values) : [0, 100];
-      if (hi - lo < MIN_SPAN) {
-        const mid = (lo + hi) / 2;
-        lo = Math.max(0, Math.min(mid - MIN_SPAN / 2, 100 - MIN_SPAN));
-        hi = lo + MIN_SPAN;
-      }
-      return [lo, hi];
-    }
-
     function renderLegend() {
       legend.innerHTML = "";
       el("span", "tm-legend-key", "Aire : nombre de titres", legend);
       el("span", "tm-legend-key", "Couleur :", legend);
       if (byPopularity() && popScale) {
         const [lo, hi] = popScale.domain();
-        el("span", null, `Popularité moyenne des titres, ${LEVEL_LABEL[popLevel] || ""}`, legend);
+        el("span", null, "Popularité moyenne des titres", legend);
         const scale = el("span", "tm-scale", null, legend);
         el("span", "tm-legend-value", String(Math.round(lo)), scale);
         const ramp = el("span", "tm-ramp", null, scale);
@@ -626,9 +605,8 @@
       const tree = layout(displayTree(focus, state.limit), width, height);
       currentTree = tree;
       readTheme();
-      popLevel = tree.leaves()[0] ? tree.leaves()[0].data.kind : null;
       const ramp = theme.dark ? [...BLUE_RAMP].reverse() : BLUE_RAMP;
-      popScale = d3.scaleSequential(d3.interpolateRgbBasis(ramp)).domain(levelExtent(popLevel)).clamp(true);
+      popScale = d3.scaleSequential(d3.interpolateRgbBasis(ramp)).domain(POPULARITY_DOMAIN).clamp(true);
       renderLegend();
       renderTail(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);

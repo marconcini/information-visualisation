@@ -21,6 +21,7 @@
   const featureMeans = (tracks) => Object.fromEntries(FEATURES.map(([key]) => [key, d3.mean(tracks, (t) => +t.row[key]) || 0]));
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
+  const countOf = (n, one, many) => `${fmtN(n)} ${n > 1 ? many : one}`;
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
 
   function el(tag, cls, text, parent) {
@@ -64,6 +65,57 @@
   }
 
   const UNKNOWN_ARTIST = "(artiste inconnu)";
+  const EXTRA_GENRE_COLORS = ["#6250d6", "#e34948", "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
+
+  const COLUMN_ALIASES = {
+    id: ["track_id", "id"],
+    name: ["track_name", "name", "title"],
+    artist: ["artist", "track_artist", "artists"],
+    popularity: ["popularity", "track_popularity"],
+    genre: ["genre", "playlist_genre"],
+    subgenre: ["subgenre", "playlist_subgenre"],
+    decade: ["decade"],
+    year: ["year", "release_year"],
+    date: ["track_album_release_date", "release_date"],
+  };
+  const REQUIRED_COLUMNS = ["genre", "subgenre", "artist", "popularity"];
+
+  function normalizeRows(rows) {
+    const columns = rows.columns || Object.keys(rows[0] || {});
+    const col = {};
+    for (const [key, names] of Object.entries(COLUMN_ALIASES)) col[key] = names.find((n) => columns.includes(n));
+    const missing = REQUIRED_COLUMNS.filter((key) => !col[key]);
+    if (!col.decade && !col.year && !col.date) missing.push("year");
+    if (missing.length) return { missing };
+
+    const seen = new Set();
+    let duplicates = 0;
+    const out = [];
+    for (const r of rows) {
+      const id = col.id ? r[col.id] : "";
+      if (id) {
+        if (seen.has(id)) {
+          duplicates += 1;
+          continue;
+        }
+        seen.add(id);
+      }
+      const year = col.year ? toNumber(r[col.year]) : col.date ? toNumber(String(r[col.date] || "").slice(0, 4)) : NaN;
+      const decade = col.decade ? toNumber(r[col.decade]) : Number.isFinite(year) ? Math.floor(year / 10) * 10 : NaN;
+      out.push({
+        ...r,
+        track_id: id,
+        track_name: col.name ? r[col.name] : "",
+        artist: r[col.artist],
+        genre: r[col.genre],
+        subgenre: r[col.subgenre],
+        popularity: r[col.popularity],
+        year,
+        decade,
+      });
+    }
+    return { rows: out, duplicates };
+  }
 
   const toNumber = (value) => (value == null || String(value).trim() === "" ? NaN : +value);
 
@@ -304,6 +356,20 @@
       popFrame = requestAnimationFrame(() => update(true));
     });
 
+    const dataControl = el("div", "tm-control tm-data", null, filters);
+    const fileInput = el("input", null, null, dataControl);
+    fileInput.type = "file";
+    fileInput.accept = ".csv,text/csv";
+    fileInput.hidden = true;
+    const loadButton = el("button", "tm-more", "Charger un CSV…", dataControl);
+    loadButton.type = "button";
+    loadButton.addEventListener("click", () => fileInput.click());
+    const restoreButton = el("button", "tm-more", "Revenir au dataset d'origine", dataControl);
+    restoreButton.type = "button";
+    restoreButton.hidden = true;
+    const dataInfo = el("span", "tm-data-info", null, dataControl);
+    dataInfo.setAttribute("aria-live", "polite");
+
     const legend = el("div", "tm-legend", null, filters);
 
     function decadeCounts(raw) {
@@ -327,8 +393,8 @@
     }
 
     function chipLabel(chip, dec, count) {
-      chip.title = `Années ${dec} : ${fmtN(count)} titres`;
-      chip.setAttribute("aria-label", `Années ${dec}, ${fmtN(count)} titres`);
+      chip.title = `Années ${dec} : ${countOf(count, "titre", "titres")}`;
+      chip.setAttribute("aria-label", `Années ${dec}, ${countOf(count, "titre", "titres")}`);
       chip.classList.toggle("is-empty", count === 0);
     }
 
@@ -389,7 +455,13 @@
     }
 
     const tint = (hue, amount) => d3.interpolateRgb(theme.surface, hue)(amount);
-    const genreTint = (g, isGroup) => tint(DataLoader.genreColor(g), isGroup ? 0.22 : theme.dark ? 0.62 : 0.52);
+    let extraGenres = [];
+    function genreColor(g) {
+      if (DataLoader.GENRE_COLORS[g]) return DataLoader.GENRE_COLORS[g];
+      const i = extraGenres.indexOf(g);
+      return i >= 0 && i < EXTRA_GENRE_COLORS.length ? EXTRA_GENRE_COLORS[i] : "#9aa0a6";
+    }
+    const genreTint = (g, isGroup) => tint(genreColor(g), isGroup ? 0.22 : theme.dark ? 0.62 : 0.52);
 
     function paint(d) {
       if (!byPopularity()) return genreTint(d.data.genre || d.data.name, Boolean(d.children));
@@ -412,11 +484,12 @@
         el("span", "tm-legend-value", String(Math.round(hi)), scale);
         return;
       }
-      DataLoader.GENRES.forEach((g) => {
+      const genres = prepared ? prepared.children.map((g) => g.name) : DataLoader.GENRES;
+      genres.forEach((g) => {
         const item = el("span", "tm-swatch-item", null, legend);
         const swatch = el("span", "tm-swatch", null, item);
         swatch.style.background = genreTint(g, false);
-        swatch.style.boxShadow = `inset 3px 0 0 ${DataLoader.genreColor(g)}`;
+        swatch.style.boxShadow = `inset 3px 0 0 ${genreColor(g)}`;
         el("span", null, DataLoader.GENRE_LABELS[g] || g, item);
       });
     }
@@ -475,7 +548,7 @@
       const parts = [];
       if (state.decades.size) parts.push(`années ${[...state.decades].sort((a, b) => a - b).join(", ")}`);
       if (state.minPopularity > 0) parts.push(`popularité ≥ ${state.minPopularity}`);
-      el("span", "tm-summary-text", `${fmtN(prepared.count)} titres retenus sur ${fmtN(total)} · ${parts.join(" · ")}`, summary);
+      el("span", "tm-summary-text", `${countOf(prepared.count, "titre retenu", "titres retenus")} sur ${fmtN(total)} · ${parts.join(" · ")}`, summary);
       const reset = el("button", "tm-more", "Réinitialiser les filtres", summary);
       reset.type = "button";
       reset.addEventListener("click", resetFilters);
@@ -517,7 +590,7 @@
       const { node, parent, share, pop } = info;
       const head = el("div", "tm-tip-title", nameOf(node), tip);
       el("span", "tm-tip-kind", ` · ${KIND_LABEL[node.kind]}`, head);
-      const parts = [`${fmtN(node.count)} titres`];
+      const parts = [`${countOf(node.count, "titre", "titres")}`];
       if (share != null) parts.push(`${fmtPct(share)} de ${nameOf(parent)}`);
       el("div", null, parts.join(" · "), tip);
       if (pop != null) el("div", null, `Popularité moyenne des titres : ${Math.round(pop)}`, tip);
@@ -613,7 +686,7 @@
         }
       }
 
-      const color = node.kind === "root" ? null : DataLoader.genreColor(node.genre);
+      const color = node.kind === "root" ? null : genreColor(node.genre);
 
       if (node.children && node.children.length) {
         const kids = node.children.slice()
@@ -623,7 +696,7 @@
         barList(card, kids.map((c) => ({
           label: nameOf(c),
           value: c.count,
-          color: color || DataLoader.genreColor(c.name),
+          color: color || genreColor(c.name),
           path: [...path, c.name],
         })), kids[0] ? kids[0].count : 1, (row) => open(row.path));
       }
@@ -777,7 +850,7 @@
       const rest = artists.slice(state.limit);
       const text = el("p", "tm-tail-text", null, tailBar);
       if (!rest.length) {
-        el("strong", null, `${fmtN(artists.length)} artistes affichés`, text);
+        el("strong", null, `${countOf(artists.length, "artiste", "artistes")} affichés`, text);
         el("span", null, ". L'aire de chaque rectangle correspond à son nombre de titres.", text);
         return;
       }
@@ -788,7 +861,7 @@
       el("strong", null, `${shown.length} artistes affichés sur ${fmtN(artists.length)}`, text);
       el("span", null, `, soit ${fmtPct(shownCount / focus.count)} des titres du sous-genre. ` +
         `La taille des rectangles est calculée entre ces ${shown.length} artistes. ` +
-        `Les ${fmtN(rest.length)} autres ont ${range} chacun (${fmtN(restCount)} titres).`, text);
+        `Les ${fmtN(rest.length)} autres ont ${range} chacun (${countOf(restCount, "titre", "titres")}).`, text);
 
       const actions = el("div", "tm-tail-actions", null, tailBar);
       const showMore = (limit) => {
@@ -807,16 +880,17 @@
     function renderDetail(artist) {
       detail.innerHTML = "";
       detail.hidden = false;
-      detail.style.borderTopColor = DataLoader.genreColor(artist.genre);
+      detail.style.borderTopColor = genreColor(artist.genre);
       const sub = findByPath(prepared, state.focusPath.slice(0, -1));
       const reference = featureMeans(sub.children.flatMap((a) => a.tracks || []));
       const own = featureMeans(artist.tracks);
+      const hasFeatures = FEATURES.every(([key]) => Number.isFinite(toNumber(artist.tracks[0].row[key])));
 
       const head = el("header", "tm-detail-head", null, detail);
       const title = el("h2", "tm-detail-title", artist.name, head);
       title.tabIndex = -1;
       el("p", "tm-detail-sub",
-        `${fmtN(artist.count)} titres · popularité moyenne des titres ${Math.round(popMean(artist))} · ${sub.name}`, head);
+        `${countOf(artist.count, "titre", "titres")} · popularité moyenne des titres ${Math.round(popMean(artist))} · ${sub.name}`, head);
 
       const body = el("div", "tm-detail-body", null, detail);
       const profile = el("section", "tm-profile", null, body);
@@ -829,13 +903,18 @@
       function showProfile(values, label) {
         profileTitle.textContent = label;
         rows.innerHTML = "";
+        if (!hasFeatures) {
+          profileTitle.textContent = "Profil audio indisponible dans ce jeu de données";
+          note.hidden = true;
+          return;
+        }
         for (const [key, name] of FEATURES) {
           const row = el("div", "tm-prow", null, rows);
           el("span", "tm-prow-label", name, row);
           const track = el("span", "tm-prow-track", null, row);
           const fill = el("span", "tm-prow-fill", null, track);
           fill.style.width = `${values[key] * 100}%`;
-          fill.style.background = DataLoader.genreColor(artist.genre);
+          fill.style.background = genreColor(artist.genre);
           const mark = el("span", "tm-prow-ref", null, track);
           mark.style.left = `${reference[key] * 100}%`;
           mark.title = `Moyenne de ${sub.name} : ${fmt2(reference[key])}`;
@@ -878,12 +957,12 @@
       const s = d.data.summary;
       if (!s || widthOf(d) < 110) return [];
       const rows = [
-        { key: "meta", type: "meta", order: 0, priority: 0, text: `${fmtPct(s.share)} du genre · ${fmtN(s.artists)} artistes` },
+        { key: "meta", type: "meta", order: 0, priority: 0, text: `${fmtPct(s.share)} du genre · ${countOf(s.artists, "artiste", "artistes")}` },
         ...s.top.map((a, i) => ({
           key: `artist-${i}`, type: "artist", order: 1 + i, priority: i < 3 ? 1 + i : 6 + i,
           text: a.name, value: fmtN(a.count),
         })),
-        { key: "hint", type: "hint", order: 9, priority: 4, text: `Explorer les ${fmtN(s.artists)} artistes →` },
+        { key: "hint", type: "hint", order: 9, priority: 4, text: `Explorer les ${countOf(s.artists, "artiste", "artistes")} →` },
       ];
       if (s.concentration != null) {
         rows.push({ key: "top", type: "meta", order: 8, priority: 5,
@@ -918,7 +997,7 @@
     function ariaLabel(d) {
       const kind = KIND_LABEL[d.data.kind];
       const action = `Entrée pour ${actionText(d)}`;
-      return `${labelOf(d)}, ${kind}, ${fmtN(d.value)} titres. ${action}.`;
+      return `${labelOf(d)}, ${kind}, ${countOf(d.value, "titre", "titres")}. ${action}.`;
     }
 
     function makeAccessible(selection) {
@@ -1028,7 +1107,7 @@
 
         cells.select(".tm-count")
           .attr("fill", ink)
-          .text((d) => (heightOf(d) >= 36 && widthOf(d) >= 60 ? `${fmtN(d.value)} titres` : ""));
+          .text((d) => (heightOf(d) >= 36 && widthOf(d) >= 60 ? `${countOf(d.value, "titre", "titres")}` : ""));
         move(cells.select(".tm-count")).attr("x", (d) => d.x0 + 5).attr("y", (d) => d.y0 + 29);
       });
     }
@@ -1071,12 +1150,15 @@
         if (!destroyed) showLoadError(err);
       });
 
+    let original = null;
+
     function loadTracks() {
       DataLoader.tracksClean()
         .then((rows) => {
           if (destroyed) return;
           tracks = rows.map(parseTrack).filter(Boolean);
           if (tracks.length < rows.length) console.warn(`${rows.length - tracks.length} lignes ignorées (valeurs manquantes ou invalides)`);
+          original = { raw: state.raw, tracks };
           popInput.disabled = false;
           popValue.textContent = String(state.minPopularity);
           update();
@@ -1092,6 +1174,71 @@
     darkQuery.addEventListener("change", onThemeChange);
     const themeObserver = new MutationObserver(onThemeChange);
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+    function useDataset(raw, list) {
+      state.raw = raw;
+      tracks = list;
+      extraGenres = list
+        ? d3.groupSort(list.filter((t) => !DataLoader.GENRE_COLORS[t.genre]), (v) => -v.length, (t) => t.genre)
+        : [];
+      state.focusPath = [];
+      state.selectedPath = null;
+      state.decades = new Set();
+      state.minPopularity = 0;
+      state.limit = ARTIST_STEP;
+      popInput.value = 0;
+      popInput.disabled = !list;
+      popValue.textContent = "0";
+      decadeCounts.all = null;
+      renderChips();
+      update();
+    }
+
+    function showDataMessage(text, isError) {
+      dataInfo.textContent = text;
+      dataInfo.classList.toggle("is-error", Boolean(isError));
+    }
+
+    function loadDataset(text, fileName) {
+      const normalized = normalizeRows(d3.csvParse(text));
+      if (normalized.missing) {
+        showDataMessage(`${fileName} refusé : colonnes manquantes (${normalized.missing.join(", ")})`, true);
+        return;
+      }
+      const list = normalized.rows.map(parseTrack).filter(Boolean);
+      if (!list.length) {
+        showDataMessage(`${fileName} refusé : aucune ligne valide`, true);
+        return;
+      }
+      useDataset(prepareFromTracks(list), list);
+      const ignored = normalized.rows.length - list.length;
+      const parts = [`${fileName} · ${countOf(list.length, "titre", "titres")}`];
+      if (normalized.duplicates) parts.push(`${countOf(normalized.duplicates, "doublon retiré", "doublons retirés")}`);
+      if (ignored) parts.push(`${countOf(ignored, "ligne ignorée", "lignes ignorées")}`);
+      showDataMessage(parts.join(" · "));
+      restoreButton.hidden = false;
+    }
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      showDataMessage(`Lecture de ${file.name}…`);
+      file.text()
+        .then((text) => loadDataset(text, file.name))
+        .catch((err) => {
+          console.error(err);
+          showDataMessage(`Impossible de lire ${file.name}`, true);
+        });
+    });
+
+    restoreButton.addEventListener("click", () => {
+      if (!original) return;
+      useDataset(original.raw, original.tracks);
+      showDataMessage("");
+      restoreButton.hidden = true;
+      loadButton.focus();
+    });
 
     function destroy() {
       destroyed = true;
@@ -1109,5 +1256,5 @@
     return { state, update, render, zoomTo, destroy };
   }
 
-  window.TreemapView = { mount, prepare, prepareFromTracks, parseTrack, popMean };
+  window.TreemapView = { mount, prepare, prepareFromTracks, parseTrack, normalizeRows, popMean };
 })();

@@ -22,6 +22,7 @@
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const countOf = (n, one, many) => `${fmtN(n)} ${n > 1 ? many : one}`;
+  const normalizeText = (str) => String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const truncate = (str, max) => (max < 3 ? "" : str.length > max ? str.slice(0, max - 1) + "…" : str);
 
   function el(tag, cls, text, parent) {
@@ -305,8 +306,26 @@
     const filters = el("div", "tm-filters", null, root);
     const navRow = el("div", "tm-navrow", null, root);
     const nav = el("nav", "tm-nav", null, navRow);
+    const searchBox = el("div", "tm-search", null, navRow);
     const summary = el("div", "tm-summary", null, navRow);
     summary.setAttribute("aria-live", "polite");
+
+    const uid = Math.random().toString(36).slice(2, 8);
+    const searchInput = el("input", "tm-search-input", null, searchBox);
+    searchInput.type = "search";
+    searchInput.placeholder = "Rechercher un artiste…";
+    searchInput.setAttribute("aria-label", "Rechercher un artiste");
+    searchInput.setAttribute("role", "combobox");
+    searchInput.setAttribute("aria-autocomplete", "list");
+    searchInput.setAttribute("aria-expanded", "false");
+    searchInput.setAttribute("aria-controls", `tm-results-${uid}`);
+    const results = el("ul", "tm-search-results", null, searchBox);
+    results.id = `tm-results-${uid}`;
+    results.setAttribute("role", "listbox");
+    results.setAttribute("aria-label", "Artistes trouvés");
+    results.hidden = true;
+    let matches = [];
+    let activeMatch = -1;
     const scene = el("div", "tm-scene", null, root);
     const tailBar = el("div", "tm-tail", null, root);
     const aside = el("aside", "tm-aside", null, root);
@@ -610,6 +629,93 @@
     function hideTip() {
       tip.hidden = true;
     }
+
+    function findArtists(query) {
+      const q = normalizeText(query.trim());
+      if (q.length < 2 || !prepared) return [];
+      const found = [];
+      for (const g of prepared.children) {
+        for (const sub of g.children) {
+          sub.children.forEach((artist, rank) => {
+            const at = normalizeText(artist.name).indexOf(q);
+            if (at >= 0) found.push({ artist, rank, starts: at === 0, path: [g.name, sub.name, artist.name] });
+          });
+        }
+      }
+      return found
+        .sort((a, b) => b.starts - a.starts || b.artist.count - a.artist.count || d3.ascending(a.artist.name, b.artist.name))
+        .slice(0, 8);
+    }
+
+    function closeResults() {
+      results.hidden = true;
+      searchInput.setAttribute("aria-expanded", "false");
+      searchInput.removeAttribute("aria-activedescendant");
+    }
+
+    function renderResults() {
+      results.innerHTML = "";
+      if (normalizeText(searchInput.value.trim()).length < 2) return closeResults();
+      results.hidden = false;
+      searchInput.setAttribute("aria-expanded", "true");
+      if (!matches.length) {
+        el("li", "tm-search-empty", "Aucun artiste trouvé avec les filtres actuels", results);
+        searchInput.removeAttribute("aria-activedescendant");
+        return;
+      }
+      matches.forEach((m, i) => {
+        const li = el("li", "tm-search-option", null, results);
+        li.id = `tm-result-${uid}-${i}`;
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", String(i === activeMatch));
+        el("strong", null, m.artist.name, li);
+        el("small", null, `${m.path[1]} (${nameOf({ kind: "genre", name: m.path[0] })}) · ${countOf(m.artist.count, "titre", "titres")}`, li);
+        li.addEventListener("mousedown", (event) => event.preventDefault());
+        li.addEventListener("click", () => chooseMatch(i));
+      });
+      if (activeMatch >= 0) {
+        searchInput.setAttribute("aria-activedescendant", `tm-result-${uid}-${activeMatch}`);
+        results.children[activeMatch].scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    function chooseMatch(i) {
+      const m = matches[i];
+      if (!m) return;
+      closeResults();
+      searchInput.value = m.artist.name;
+      if (tracks) {
+        zoomTo(m.path);
+        return;
+      }
+      zoomTo(m.path.slice(0, 2));
+      state.limit = Math.max(ARTIST_STEP, Math.ceil((m.rank + 1) / ARTIST_STEP) * ARTIST_STEP);
+      select(m.path);
+      requestRender();
+    }
+
+    searchInput.addEventListener("input", () => {
+      matches = findArtists(searchInput.value);
+      activeMatch = matches.length ? 0 : -1;
+      renderResults();
+    });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (!matches.length) return;
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        activeMatch = (activeMatch + step + matches.length) % matches.length;
+        renderResults();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        chooseMatch(activeMatch);
+      } else if (event.key === "Escape") {
+        event.stopPropagation();
+        if (!results.hidden) closeResults();
+        else searchInput.value = "";
+      }
+    });
+    searchInput.addEventListener("blur", closeResults);
 
     function select(path) {
       state.selectedPath = path;

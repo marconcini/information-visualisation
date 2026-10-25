@@ -48,6 +48,7 @@ export class ParallelCoordinates {
             .filter(Number.isFinite);
         this.popularityBounds = d3.extent(popularityValues);
         this.popularityRange = [...this.popularityBounds];
+        this.artistSearch = "";
 
         this.init();
     }
@@ -83,6 +84,25 @@ export class ParallelCoordinates {
 
 
         const container = d3.select(this.containerSelector);
+
+        this.tooltip = container.append("div")
+            .attr("class", "parallel-coordinates-tooltip")
+            .style("display", "none")
+            .style("position", "fixed")
+            .style("pointer-events", "none")
+            .style("z-index", "10")
+            .style("min-width", "190px")
+            .style("max-width", "280px")
+            .style("padding", "12px 14px")
+            .style("background", "#ffffff")
+            .style("color", "#273142")
+            .style("border", "1px solid #e2e8f0")
+            .style("border-left", "4px solid #64748b")
+            .style("border-radius", "8px")
+            .style("box-shadow", "0 8px 24px rgba(15, 23, 42, 0.18)")
+            .style("font-family", "Arial, sans-serif")
+            .style("font-size", "12px")
+            .style("line-height", "1.4");
 
 
         // Sélecteur du mode d'affichage
@@ -166,6 +186,28 @@ export class ParallelCoordinates {
                 const value = +d3.event.target.value;
                 this.popularityRange[1] = Math.max(value, this.popularityRange[0]);
                 this.syncPopularityControls();
+                this.render();
+            });
+
+        // Recherche d'un artiste
+        const artistControls = container.append("div")
+            .attr("class", "artist-search-controls")
+            .style("display", "flex")
+            .style("gap", "8px")
+            .style("align-items", "center")
+            .style("margin-bottom", "15px");
+
+        artistControls.append("label")
+            .attr("for", "parallel-coordinates-artist-search")
+            .text("Artiste");
+
+        artistControls.append("input")
+            .attr("id", "parallel-coordinates-artist-search")
+            .attr("class", "artist-search")
+            .attr("type", "search")
+            .attr("placeholder", "Rechercher un artiste")
+            .on("input", () => {
+                this.artistSearch = d3.event.target.value.trim();
                 this.render();
             });
 
@@ -331,7 +373,8 @@ export class ParallelCoordinates {
             .key(d => d.genre)
             .entries(this.data.filter(d =>
                 this.selectedSubGenres.has(d.subgenre) &&
-                this.isPopularityInRange(d)
+                this.isPopularityInRange(d) &&
+                this.matchesArtist(d)
             ));
 
         return groups.map(group => {
@@ -360,6 +403,13 @@ export class ParallelCoordinates {
             popularity <= this.popularityRange[1];
     }
 
+    matchesArtist(track) {
+        return !this.artistSearch ||
+            String(track.artist || "")
+                .toLocaleLowerCase()
+                .includes(this.artistSearch.toLocaleLowerCase());
+    }
+
     path(d) {
         // Crée un chemin pour une chanson donnée
         return d3.line()(
@@ -372,6 +422,7 @@ export class ParallelCoordinates {
 
     render() {
         // Ne garder que les genres sélectionnés
+        this.hideTooltip();
 
 
         let displayedData = this.mode === 'average'
@@ -381,7 +432,9 @@ export class ParallelCoordinates {
         displayedData = displayedData.filter(d =>
             this.selectedGenres.has(d.genre) &&
             (this.mode === "average" ||
-                (this.selectedSubGenres.has(d.subgenre) && this.isPopularityInRange(d)))
+                (this.selectedSubGenres.has(d.subgenre) &&
+                    this.isPopularityInRange(d) &&
+                    this.matchesArtist(d)))
         );
 
 
@@ -405,7 +458,10 @@ export class ParallelCoordinates {
             .attr('fill', 'none')
             .attr('stroke', d => DataLoader.genreColor(d.genre))
             .attr('stroke-width', this.mode === 'average' ? 3 : 1.5)
-            .attr('opacity', this.mode === 'average' ? 1 : 0.08);
+            .attr('opacity', this.mode === 'average' ? 1 : 0.08)
+            .on("mouseover", d => this.showTooltip(d, d3.event))
+            .on("mousemove", () => this.positionTooltip(d3.event))
+            .on("mouseout", () => this.hideTooltip());
 
         // 4. Créer les axes une seule fois
         let axisGroup = this.svg.selectAll('.dimension-axis');
@@ -437,5 +493,98 @@ export class ParallelCoordinates {
             d3.select(nodes[i])
                 .call(d3.axisLeft(this.yScales[dim]));
         });
+    }
+
+    showTooltip(track, event) {
+        this.clearHighlightedLine();
+        this.highlightedLine = d3.select(event.currentTarget);
+        this.highlightedLine
+            .attr("stroke-width", this.mode === "average" ? 5 : 3)
+            .attr("opacity", 1)
+            .style("filter", "drop-shadow(0 0 3px rgba(15, 23, 42, 0.45))");
+
+        this.tooltip
+            .style("border-left-color", DataLoader.genreColor(track.genre))
+            .style("display", "block");
+
+        this.tooltip.selectAll("*").remove();
+
+        const title = this.mode === "individual"
+            ? track.track_name || "Titre inconnu"
+            : `Moyenne - ${track.genre || "Genre inconnu"}`;
+
+        this.tooltip.append("div")
+            .style("margin-bottom", "8px")
+            .style("color", DataLoader.genreColor(track.genre))
+            .style("font-size", "14px")
+            .style("font-weight", "bold")
+            .style("line-height", "1.25")
+            .text(title);
+
+        const rows = this.mode === "individual"
+            ? [
+                ["Artiste", track.artist || "Inconnu"],
+                ["Genre", track.genre || "Inconnu"],
+                ["Sous-genre", track.subgenre || "Inconnu"],
+                ["Popularité", track.popularity ?? "Inconnue"]
+            ]
+            : [["Caractéristiques", "Moyenne du genre"]];
+
+        rows.forEach(([label, value]) => {
+            const row = this.tooltip.append("div")
+                .style("display", "flex")
+                .style("justify-content", "space-between")
+                .style("gap", "16px")
+                .style("padding", "3px 0")
+                .style("border-top", "1px solid #f1f5f9");
+
+            row.append("span")
+                .style("color", "#64748b")
+                .text(`${label} :`);
+            row.append("span")
+                .style("font-weight", "600")
+                .style("text-align", "right")
+                .text(value);
+        });
+
+        this.positionTooltip(event);
+    }
+
+    positionTooltip(event) {
+        if (this.tooltip.style("display") === "none") {
+            return;
+        }
+
+        const tooltipNode = this.tooltip.node();
+        const offset = 14;
+        const left = Math.min(
+            event.clientX + offset,
+            window.innerWidth - tooltipNode.offsetWidth - offset
+        );
+        const top = Math.min(
+            event.clientY + offset,
+            window.innerHeight - tooltipNode.offsetHeight - offset
+        );
+
+        this.tooltip
+            .style("left", `${Math.max(offset, left)}px`)
+            .style("top", `${Math.max(offset, top)}px`);
+    }
+
+    hideTooltip() {
+        this.clearHighlightedLine();
+        this.tooltip.style("display", "none");
+    }
+
+    clearHighlightedLine() {
+        if (!this.highlightedLine || this.highlightedLine.empty()) {
+            return;
+        }
+
+        this.highlightedLine
+            .attr("stroke-width", this.mode === "average" ? 3 : 1.5)
+            .attr("opacity", this.mode === "average" ? 1 : 0.08)
+            .style("filter", null);
+        this.highlightedLine = null;
     }
 }

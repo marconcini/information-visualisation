@@ -43,11 +43,7 @@ export class ParallelCoordinates {
             data.map(d => d.subgenre)
         );
 
-        const popularityValues = this.data
-            .map(d => +d.popularity)
-            .filter(Number.isFinite);
-        this.popularityBounds = d3.extent(popularityValues);
-        this.popularityRange = [...this.popularityBounds];
+        this.brushRanges = {};
         this.artistSearch = "";
 
         this.init();
@@ -140,54 +136,6 @@ export class ParallelCoordinates {
             label.append("span")
                 .text(mode.label);
         });
-
-        // Jauges de sélection de la popularité
-        const popularityControls = container.append("div")
-            .attr("class", "popularity-controls")
-            .style("display", "flex")
-            .style("flex-direction", "column")
-            .style("gap", "4px")
-            .style("margin-bottom", "15px");
-
-        popularityControls.append("span")
-            .attr("class", "popularity-label");
-
-        const popularitySliders = popularityControls.append("div")
-            .style("display", "flex")
-            .style("gap", "10px")
-            .style("align-items", "center");
-
-        popularitySliders.append("span")
-            .text("Min");
-
-        popularitySliders.append("input")
-            .attr("class", "popularity-min")
-            .attr("type", "range")
-            .attr("min", this.popularityBounds[0])
-            .attr("max", this.popularityBounds[1])
-            .attr("value", this.popularityRange[0])
-            .on("input", () => {
-                const value = +d3.event.target.value;
-                this.popularityRange[0] = Math.min(value, this.popularityRange[1]);
-                this.syncPopularityControls();
-                this.render();
-            });
-
-        popularitySliders.append("span")
-            .text("Max");
-
-        popularitySliders.append("input")
-            .attr("class", "popularity-max")
-            .attr("type", "range")
-            .attr("min", this.popularityBounds[0])
-            .attr("max", this.popularityBounds[1])
-            .attr("value", this.popularityRange[1])
-            .on("input", () => {
-                const value = +d3.event.target.value;
-                this.popularityRange[1] = Math.max(value, this.popularityRange[0]);
-                this.syncPopularityControls();
-                this.render();
-            });
 
         // Recherche d'un artiste
         const artistControls = container.append("div")
@@ -321,7 +269,6 @@ export class ParallelCoordinates {
                 .text(subgenre => subgenre);
         });
 
-        this.syncPopularityControls();
         this.render();
     }
 
@@ -353,27 +300,12 @@ export class ParallelCoordinates {
             .property("checked", subgenre => this.selectedSubGenres.has(subgenre));
     }
 
-    syncPopularityControls() {
-        const [minPopularity, maxPopularity] = this.popularityRange;
-        const popularityControls = d3.select(this.containerSelector)
-            .select(".popularity-controls");
-
-        popularityControls.select(".popularity-min")
-            .property("value", minPopularity);
-        popularityControls.select(".popularity-max")
-            .property("value", maxPopularity);
-        popularityControls.select(".popularity-label")
-            .text(`Popularité : ${minPopularity} - ${maxPopularity}`);
-    }
-
-
     calcutateAverageByGenre() {
         // Remplacer d3.group par un regroupement classique
         const groups = d3.nest()
             .key(d => d.genre)
             .entries(this.data.filter(d =>
                 this.selectedSubGenres.has(d.subgenre) &&
-                this.isPopularityInRange(d) &&
                 this.matchesArtist(d)
             ));
 
@@ -396,11 +328,16 @@ export class ParallelCoordinates {
         });
     }
 
-    isPopularityInRange(track) {
-        const popularity = +track.popularity;
-        return Number.isFinite(popularity) &&
-            popularity >= this.popularityRange[0] &&
-            popularity <= this.popularityRange[1];
+    isWithinBrushes(track) {
+        return this.characteristics.every(dim => {
+            const range = this.brushRanges[dim];
+            const value = +track[dim];
+
+            return !range ||
+                (Number.isFinite(value) &&
+                    value >= range[0] &&
+                    value <= range[1]);
+        });
     }
 
     matchesArtist(track) {
@@ -433,9 +370,13 @@ export class ParallelCoordinates {
             this.selectedGenres.has(d.genre) &&
             (this.mode === "average" ||
                 (this.selectedSubGenres.has(d.subgenre) &&
-                    this.isPopularityInRange(d) &&
+                    this.isWithinBrushes(d) &&
                     this.matchesArtist(d)))
         );
+
+        if (this.mode === "average") {
+            displayedData = displayedData.filter(d => this.isWithinBrushes(d));
+        }
 
 
         // 3. Créer le groupe des lignes une seule fois
@@ -486,12 +427,38 @@ export class ParallelCoordinates {
                 .style('fill', '#333')
                 .style('font-weight', 'bold')
                 .style('font-size', '12px');
+
+            axisGroup.append("g")
+                .attr("class", "brush")
+                .each((dim, i, nodes) => {
+                    const brush = d3.brushY()
+                        .extent([[-12, 0], [12, this.height]])
+                        .on("brush", () => {
+                            const selection = d3.event.selection;
+
+                            if (!selection) {
+                                delete this.brushRanges[dim];
+                            } else {
+                                this.brushRanges[dim] = [
+                                    this.yScales[dim].invert(selection[1]),
+                                    this.yScales[dim].invert(selection[0])
+                                ];
+                            }
+
+                            this.render();
+                        });
+
+                    d3.select(nodes[i])
+                        .datum(dim)
+                        .call(brush);
+                });
         }
 
         // 5. Redessiner les axes existants sans en créer de nouveaux
         axisGroup.each((dim, i, nodes) => {
             d3.select(nodes[i])
                 .call(d3.axisLeft(this.yScales[dim]));
+
         });
     }
 

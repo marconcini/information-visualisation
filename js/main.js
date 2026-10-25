@@ -1,8 +1,7 @@
-import {ParallelCoordinates} from "./views/parallels_coords.js";
+import { ParallelCoordinates } from "./views/parallels_coords.js";
 
 async function init() {
-    // 1. Chargement des données
-    const data = await d3.csv("data/derived/tracks_features.csv");
+    const data = await DataLoader.tracksFeatures();
 
     // 2. Définition des dimensions à afficher
     const characteristics = ['popularity', 'danceability', 'energy', 'valence', 'acousticness', 'speechiness', 'instrumentalness', 'liveness'];

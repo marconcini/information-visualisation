@@ -1,6 +1,3 @@
-import DataLoader from "../core/DataLoader.js";
-
-
 export class ParallelCoordinates {
     /**
      * @param {string} containerSelector - Ex: '#parallel-coords'
@@ -23,14 +20,16 @@ export class ParallelCoordinates {
 
         this.mode = 'average'; // Mode par défaut : moyenne par genre
 
-        this.genres = [...new Set(this.data.map(d => d.genre))];
+        this.genres = DataLoader.GENRES.filter(genre =>
+            this.data.some(d => d.genre === genre)
+        );
 
         this.selectedGenres = new Set(
-            data.map(d => d.genre)
+            this.genres
         );
 
         this.colorScale = d3.scaleOrdinal()
-            .domain([...new Set(data.map(d => d.genre))])
+            .domain(DataLoader.GENRES)
             .range(d3.schemeTableau10);
 
 
@@ -211,7 +210,7 @@ export class ParallelCoordinates {
         genreItems.append("span")
             .style("color", genre => DataLoader.genreColor(genre))
             .style("font-weight", "bold")
-            .text(genre => genre);
+            .text(genre => DataLoader.GENRE_LABELS[genre] || genre);
 
 
         // Une case à cocher par sous-genre, regroupée par genre

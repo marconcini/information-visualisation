@@ -56,6 +56,7 @@ export class ParallelCoordinates {
 
         this.svg = d3.select(this.containerSelector)
             .append('svg')
+            .attr('class', 'parallel-coordinates-svg')
             .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
             .append('g')
             .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
@@ -124,11 +125,18 @@ export class ParallelCoordinates {
 
                     if (this.mode === "individual") {
                         this.ensureSingleGenre();
-                        this.ensureSingleSubGenre();
+                        const selectedGenre = this.genres.find(genre =>
+                            this.selectedGenres.has(genre)
+                        );
+                        this.selectedSubGenres = new Set(
+                            this.subGenresByGenre[selectedGenre] || []
+                        );
                         this.syncGenreCheckboxes();
                         this.syncSubGenreCheckboxes();
                     }
 
+                    this.syncGenreCheckboxes();
+                    this.syncSubGenreCheckboxes();
                     this.render();
                 });
 
@@ -155,6 +163,7 @@ export class ParallelCoordinates {
             .attr("placeholder", "Rechercher un artiste")
             .on("input", () => {
                 this.artistSearch = d3.event.target.value.trim();
+                this.syncSubGenreCheckboxes();
                 this.render();
             });
 
@@ -166,40 +175,50 @@ export class ParallelCoordinates {
             .style("gap", "10px")
             .style("margin-bottom", "15px");
 
-        // Une case à cocher par genre
-        const genreItems = this.legend.selectAll(".genre-item")
+        // Une case à cocher par sous-genre, regroupée par genre
+        const subGenreGroups = this.legend.append("div")
+            .attr("class", "subgenre-groups")
+            .selectAll(".subgenre-group")
             .data(this.genres)
             .enter()
-            .append("label")
-            .attr("class", "genre-item")
-            .style("display", "inline-flex")
-            .style("align-items", "center")
-            .style("gap", "5px")
-            .style("cursor", "pointer");
+            .append("div")
+            .attr("class", "subgenre-group")
+            .style("display", "flex");
 
-        genreItems.append("input")
+        const subGenreGroupHeaders = subGenreGroups.append("div")
+            .attr("class", "subgenre-group-header");
+
+        subGenreGroupHeaders.append("label")
+            .attr("class", "subgenre-genre-toggle")
+            .style("color", genre => DataLoader.genreColor(genre))
+            .text(genre => DataLoader.GENRE_LABELS[genre] || genre)
+            .append("input")
             .attr("type", "checkbox")
-            .property("checked", true)
             .on("change", genre => {
                 const checked = d3.event.target.checked;
+                const subgenres = this.subGenresByGenre[genre] || [];
 
                 if (this.mode === "individual") {
-                    if (checked) {
-                        this.selectedGenres = new Set([genre]);
-                    } else {
-                        this.selectedGenres.add(genre);
-                    }
+                    this.selectedGenres = checked ? new Set([genre]) : new Set();
+                    this.selectedSubGenres = checked
+                        ? new Set(subgenres)
+                        : new Set([...this.selectedSubGenres].filter(subgenre =>
+                            !subgenres.includes(subgenre)
+                        ));
                 } else {
                     if (checked) {
                         this.selectedGenres.add(genre);
                     } else {
                         this.selectedGenres.delete(genre);
                     }
-                }
 
-                if (this.mode === "individual") {
-                    this.ensureSingleGenre();
-                    this.ensureSingleSubGenre();
+                    subgenres.forEach(subgenre => {
+                        if (checked) {
+                            this.selectedSubGenres.add(subgenre);
+                        } else {
+                            this.selectedSubGenres.delete(subgenre);
+                        }
+                    });
                 }
 
                 this.syncGenreCheckboxes();
@@ -207,34 +226,49 @@ export class ParallelCoordinates {
                 this.render();
             });
 
-        genreItems.append("span")
-            .style("color", genre => DataLoader.genreColor(genre))
-            .style("font-weight", "bold")
-            .text(genre => DataLoader.GENRE_LABELS[genre] || genre);
+        subGenreGroups.append("label")
+            .attr("class", "subgenre-toggle-all")
+            .text("Sélectionner tous")
+            .append("input")
+            .attr("type", "checkbox")
+            .on("change", genre => {
+                const checked = d3.event.target.checked;
+                const subgenres = this.subGenresByGenre[genre] || [];
 
+                if (this.mode === "individual") {
+                    this.selectedGenres = checked ? new Set([genre]) : new Set();
+                    this.selectedSubGenres = checked
+                        ? new Set(subgenres)
+                        : new Set([...this.selectedSubGenres].filter(subgenre =>
+                            !subgenres.includes(subgenre)
+                        ));
+                } else {
+                    subgenres.forEach(subgenre => {
+                        if (checked) {
+                            this.selectedSubGenres.add(subgenre);
+                        } else {
+                            this.selectedSubGenres.delete(subgenre);
+                        }
+                    });
+                    if (checked) {
+                        this.selectedGenres.add(genre);
+                    } else {
+                        this.selectedGenres.delete(genre);
+                    }
+                }
 
-        // Une case à cocher par sous-genre, regroupée par genre
-        const subGenreGroups = this.legend.selectAll(".subgenre-group")
-            .data(this.genres)
-            .enter()
-            .append("div")
-            .attr("class", "subgenre-group")
-            .style("display", genre => this.selectedGenres.has(genre) ? "flex" : "none")
-            .style("flex-direction", "column")
-            .style("gap", "4px")
-            .style("margin-left", "15px")
-            .style("width", "100%");
-
-        subGenreGroups.append("span")
-            .attr("class", "subgenre-group-title")
-            .style("font-weight", "bold")
-            .text(genre => genre);
+                this.syncGenreCheckboxes();
+                this.syncSubGenreCheckboxes();
+                this.render();
+            });
 
         subGenreGroups.each((genre, i, nodes) => {
             const group = d3.select(nodes[i]);
             const subgenres = this.subGenresByGenre[genre] || [];
 
-            const subGenreItems = group.selectAll(".subgenre-item")
+            const subGenreItems = group.append("div")
+                .attr("class", "subgenre-list")
+                .selectAll(".subgenre-item")
                 .data(subgenres)
                 .enter()
                 .append("label")
@@ -250,16 +284,23 @@ export class ParallelCoordinates {
                 .on("change", subgenre => {
                     const checked = d3.event.target.checked;
 
-                    if (this.mode === "individual") {
-                        this.selectedSubGenres = checked
-                            ? new Set([subgenre])
-                            : this.selectedSubGenres;
-                    } else if (checked) {
+                    if (checked) {
                         this.selectedSubGenres.add(subgenre);
                     } else {
                         this.selectedSubGenres.delete(subgenre);
                     }
 
+                    const hasSelectedSubgenre = (this.subGenresByGenre[genre] || [])
+                        .some(value => this.selectedSubGenres.has(value));
+                    if (this.mode === "individual" && checked) {
+                        this.selectedGenres = new Set([genre]);
+                    } else if (hasSelectedSubgenre) {
+                        this.selectedGenres.add(genre);
+                    } else {
+                        this.selectedGenres.delete(genre);
+                    }
+
+                    this.syncGenreCheckboxes();
                     this.syncSubGenreCheckboxes();
                     this.render();
                 });
@@ -268,6 +309,8 @@ export class ParallelCoordinates {
                 .text(subgenre => subgenre);
         });
 
+        this.syncGenreCheckboxes();
+        this.syncSubGenreCheckboxes();
         this.render();
     }
 
@@ -276,27 +319,38 @@ export class ParallelCoordinates {
         this.selectedGenres = new Set(selectedGenre ? [selectedGenre] : [this.genres[0]]);
     }
 
-    ensureSingleSubGenre() {
-        const selectedGenre = this.genres.find(genre => this.selectedGenres.has(genre));
-        const subgenres = this.subGenresByGenre[selectedGenre] || [];
-        const selectedSubGenre = subgenres.find(subgenre => this.selectedSubGenres.has(subgenre));
-
-        this.selectedSubGenres = new Set(
-            selectedSubGenre ? [selectedSubGenre] : subgenres.slice(0, 1)
-        );
-    }
-
     syncGenreCheckboxes() {
-        this.legend.selectAll(".genre-item input")
-            .property("checked", genre => this.selectedGenres.has(genre));
+        this.legend.selectAll(".subgenre-group").each((genre, i, nodes) => {
+            const subgenres = this.subGenresByGenre[genre] || [];
+            const selectedCount = subgenres.filter(subgenre =>
+                this.selectedSubGenres.has(subgenre)
+            ).length;
+            const toggle = d3.select(nodes[i]).select(".subgenre-genre-toggle input");
+
+            toggle
+                .property("checked", selectedCount === subgenres.length && subgenres.length > 0)
+                .property("indeterminate", selectedCount > 0 && selectedCount < subgenres.length);
+        });
 
         this.legend.selectAll(".subgenre-group")
-            .style("display", genre => this.selectedGenres.has(genre) ? "flex" : "none");
+            .style("display", "flex");
     }
 
     syncSubGenreCheckboxes() {
         this.legend.selectAll(".subgenre-item input")
             .property("checked", subgenre => this.selectedSubGenres.has(subgenre));
+
+        this.legend.selectAll(".subgenre-group").each((genre, i, nodes) => {
+            const subgenres = this.subGenresByGenre[genre] || [];
+            const selectedCount = subgenres.filter(subgenre =>
+                this.selectedSubGenres.has(subgenre)
+            ).length;
+            const toggle = d3.select(nodes[i]).select(".subgenre-toggle-all input");
+
+            toggle
+                .property("checked", subgenres.length > 0 && selectedCount === subgenres.length)
+                .property("indeterminate", selectedCount > 0 && selectedCount < subgenres.length);
+        });
     }
 
     calcutateAverageByGenre() {
@@ -398,7 +452,7 @@ export class ParallelCoordinates {
             .attr('fill', 'none')
             .attr('stroke', d => DataLoader.genreColor(d.genre))
             .attr('stroke-width', this.mode === 'average' ? 3 : 1.5)
-            .attr('opacity', this.mode === 'average' ? 1 : 0.08)
+            .attr('opacity', this.mode === 'average' ? 1 : 0.16)
             .on("mouseover", d => this.showTooltip(d, d3.event))
             .on("mousemove", () => this.positionTooltip(d3.event))
             .on("mouseout", () => this.hideTooltip());
@@ -549,7 +603,7 @@ export class ParallelCoordinates {
 
         this.highlightedLine
             .attr("stroke-width", this.mode === "average" ? 3 : 1.5)
-            .attr("opacity", this.mode === "average" ? 1 : 0.08)
+            .attr("opacity", this.mode === "average" ? 1 : 0.16)
             .style("filter", null);
         this.highlightedLine = null;
     }

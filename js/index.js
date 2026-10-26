@@ -84,7 +84,7 @@ const PIPELINE = {
   rows: [
     { step: "01 · Normalisation min-max", file: "tracks_features.csv", sub: "9 features dans [0, 1]", visu: "coordonnees" },
     { step: "02 · Hiérarchie", file: "hierarchy.json", sub: "genre → sous-genre → artiste", visu: "treemap", extra: "tracks_clean" },
-    { step: "03 · Agrégation", file: "trends.json", sub: "moyennes décennie × genre", visu: "courbes" },
+    { step: "03 · Agrégation", file: "trends.json", sub: "moyennes décennie × genre", visu: "courbes", extra: "tracks_clean" },
     { step: "04 · Corrélation de Pearson", file: "correlation.json", sub: "matrice 10 × 10", visu: "heatmap", extra: "tracks_features" },
     { step: "05 · Enrichissement", file: "countries.json", sub: "artiste → pays (MusicBrainz)", visu: "carte", label: "Carte (bonus)", extra: "tracks_clean" },
   ],

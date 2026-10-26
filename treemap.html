@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treemap Spotify</title>
+<link rel="stylesheet" href="css/treemap.css">
+</head>
+<body class="tm-page">
+<header class="tm-header">
+  <h1>Treemap zoomable : genre → sous-genre → artiste</h1>
+  <p class="tm-lead">Structure : hiérarchie · Tâches : vue d'ensemble, comparer des volumes, explorer</p>
+</header>
+
+<div id="treemap-view"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="js/DataLoader.js"></script>
+<script src="js/views/treemap.js"></script>
+<script>TreemapView.mount(document.getElementById("treemap-view"));</script>
+</body>
+</html>

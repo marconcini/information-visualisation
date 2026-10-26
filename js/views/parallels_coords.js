@@ -90,12 +90,12 @@ export class ParallelCoordinates {
             .style("min-width", "190px")
             .style("max-width", "280px")
             .style("padding", "12px 14px")
-            .style("background", "#ffffff")
-            .style("color", "#273142")
-            .style("border", "1px solid #e2e8f0")
-            .style("border-left", "4px solid #64748b")
+            .style("background", "#20242b")
+            .style("color", "#e6e7ea")
+            .style("border", "1px solid #444a55")
+            .style("border-left", "4px solid #5b9bd8")
             .style("border-radius", "8px")
-            .style("box-shadow", "0 8px 24px rgba(15, 23, 42, 0.18)")
+            .style("box-shadow", "0 8px 24px rgba(0, 0, 0, 0.45)")
             .style("font-family", "Arial, sans-serif")
             .style("font-size", "12px")
             .style("line-height", "1.4");
@@ -477,7 +477,7 @@ export class ParallelCoordinates {
                 .style('text-anchor', 'middle')
                 .attr('y', -10)
                 .text(dim => dim)
-                .style('fill', '#333')
+                .style('fill', '#e6e7ea')
                 .style('font-weight', 'bold')
                 .style('font-size', '12px');
 
@@ -556,10 +556,10 @@ export class ParallelCoordinates {
                 .style("justify-content", "space-between")
                 .style("gap", "16px")
                 .style("padding", "3px 0")
-                .style("border-top", "1px solid #f1f5f9");
+                .style("border-top", "1px solid #2c3038");
 
             row.append("span")
-                .style("color", "#64748b")
+                .style("color", "#a6abb3")
                 .text(`${label} :`);
             row.append("span")
                 .style("font-weight", "600")

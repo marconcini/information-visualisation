@@ -12,13 +12,15 @@
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <style>
         :root {
-            color-scheme: light;
-            --ink: #172033;
-            --muted: #64748b;
-            --line: #dbe3ee;
-            --surface: #ffffff;
-            --background: #f4f7fb;
-            --accent: #5167d8;
+            color-scheme: dark;
+            --ink: #e6e7ea;
+            --muted: #a6abb3;
+            --line: #2c3038;
+            --line-strong: #444a55;
+            --surface: #17191d;
+            --surface-soft: #20242b;
+            --background: #17191d;
+            --accent: #5b9bd8;
         }
 
         * {
@@ -29,7 +31,6 @@
             min-width: 320px;
             margin: 0;
             background:
-                radial-gradient(circle at 15% 0%, #e8edff 0, transparent 34rem),
                 var(--background);
             color: var(--ink);
             font-family: "DM Sans", Arial, sans-serif;
@@ -54,10 +55,10 @@
         .parallel-coords-chart {
             overflow: hidden;
             padding: clamp(18px, 3vw, 32px);
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(219, 227, 238, 0.9);
+            background: var(--surface);
+            border: 1px solid var(--line);
             border-radius: 20px;
-            box-shadow: 0 18px 45px rgba(38, 53, 87, 0.1);
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
         }
 
         .parallel-coords-chart h2 {
@@ -86,7 +87,7 @@
 
         .mode-controls {
             padding: 5px;
-            background: #f1f4fb;
+            background: var(--surface-soft);
             border-radius: 10px;
         }
 
@@ -100,7 +101,7 @@
         .mode-controls label:has(input:checked) {
             color: var(--ink);
             background: var(--surface);
-            box-shadow: 0 2px 8px rgba(38, 53, 87, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .mode-controls input,
@@ -146,7 +147,7 @@
             flex-direction: column;
             min-width: 0;
             padding: 12px;
-            background: #fbfcfe;
+            background: var(--surface-soft);
             border: 1px solid var(--line);
             border-radius: 10px;
             color: var(--muted);
@@ -220,7 +221,7 @@
 
         .dimension-axis .domain,
         .dimension-axis .tick line {
-            stroke: #b7c3d4;
+            stroke: var(--line-strong);
         }
 
         .dimension-axis .tick text {

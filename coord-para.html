@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordonnées parallèles - Visualisations D3.js</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #e6e7ea;
+            --muted: #a6abb3;
+            --line: #2c3038;
+            --line-strong: #444a55;
+            --surface: #17191d;
+            --surface-soft: #20242b;
+            --background: #17191d;
+            --accent: #5b9bd8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-width: 320px;
+            margin: 0;
+            background:
+                var(--background);
+            color: var(--ink);
+            font-family: "DM Sans", Arial, sans-serif;
+        }
+
+        header {
+            padding: 34px clamp(20px, 5vw, 72px) 24px;
+        }
+
+        header h1 {
+            max-width: 1180px;
+            margin: 0 auto;
+            font-size: clamp(1.7rem, 3vw, 2.5rem);
+            letter-spacing: -0.04em;
+        }
+
+        .dashboard-grid {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto 48px;
+        }
+
+        .parallel-coords-chart {
+            overflow: hidden;
+            padding: clamp(18px, 3vw, 32px);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+        }
+
+        .parallel-coords-chart h2 {
+            margin: 0 0 24px;
+            font-size: clamp(1.1rem, 2vw, 1.45rem);
+            letter-spacing: -0.025em;
+        }
+
+        .viz-container {
+            width: 100%;
+        }
+
+        .viz-container > svg {
+            display: block;
+            width: 100%;
+            min-height: 390px;
+            margin-top: 20px;
+        }
+
+        .mode-controls,
+        .artist-search-controls {
+            align-items: center;
+            flex-wrap: wrap;
+            color: var(--muted);
+        }
+
+        .mode-controls {
+            padding: 5px;
+            background: var(--surface-soft);
+            border-radius: 10px;
+        }
+
+        .mode-controls label {
+            padding: 8px 12px;
+            border-radius: 7px;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        .mode-controls label:has(input:checked) {
+            color: var(--ink);
+            background: var(--surface);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-controls input,
+        .subgenre-genre-toggle input,
+        .subgenre-item input,
+        .subgenre-toggle-all input {
+            accent-color: var(--accent);
+        }
+
+        .artist-search-controls {
+            margin-top: 18px;
+        }
+
+        .artist-search-controls label {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .artist-search {
+            width: min(280px, 100%);
+            padding: 9px 12px;
+            color: var(--ink);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            font: inherit;
+            outline: none;
+        }
+
+        .artist-search:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(81, 103, 216, 0.13);
+        }
+
+        .genre-legend {
+            display: block;
+            padding: 16px 0 4px;
+            border-top: 1px solid var(--line);
+        }
+
+        .subgenre-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            padding: 12px;
+            background: var(--surface-soft);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .subgenre-group-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .subgenre-genre-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--ink);
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .subgenre-toggle-all {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 7px 0 0;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.72rem;
+        }
+
+        .subgenre-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 5px 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding-top: 9px;
+        }
+
+        .subgenre-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+            min-width: 0;
+            cursor: pointer;
+            line-height: 1.25;
+        }
+
+        .subgenre-item span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .subgenre-groups {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 10px;
+            max-width: 100%;
+            overflow-x: auto;
+            padding: 2px 4px 4px 0;
+        }
+
+        .subgenre-groups .subgenre-group {
+            flex: 0 0 240px;
+        }
+
+        .dimension-axis .domain,
+        .dimension-axis .tick line {
+            stroke: var(--line-strong);
+        }
+
+        .dimension-axis .tick text {
+            fill: var(--muted);
+            font-size: 10px;
+        }
+
+        .dimension-label {
+            fill: var(--ink) !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+        }
+
+        .brush .selection {
+            fill: rgba(81, 103, 216, 0.22);
+            stroke: var(--accent);
+            stroke-width: 1.5px;
+        }
+
+        .brush .overlay {
+            cursor: crosshair;
+        }
+
+        .lines path {
+            transition: opacity 160ms ease, stroke-width 160ms ease;
+        }
+
+        @media (max-width: 700px) {
+            .parallel-coords-chart {
+                padding: 16px 10px;
+                overflow-x: auto;
+            }
+
+            .viz-container > svg {
+                min-width: 700px;
+                margin-left: -6px;
+            }
+        }
+    </style>
+    <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="js/DataLoader.js"></script>
+</head>
+
+<body>
+
+    <header>
+        <h1>Coordonnées parallèles</h1>
+    </header>
+
+    <main class="dashboard-grid">
+        <section class="parallel-coords-chart">
+            <h2>Coordonnées parallèles des titres Spotify</h2>
+            <div id="parallel-coords-chart" class="viz-container"></div>
+        </section>
+    </main>
+
+    <script type="module" src="./js/main.js"></script>
+
+</body>
+
+</html>

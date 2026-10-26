@@ -63,3 +63,11 @@ reste actif quand on passe à une autre (**brushing & linking**).
 python3 -m http.server 8000
 ```
 puis ouvrir <http://localhost:8000> (serveur nécessaire pour charger les données).
+
+`index.html` rassemble les visualisations : un onglet par vue, chacune affichée
+dans un cadre à partir de sa propre page (`treemap.html`, `heatmap.html`, …).
+Une page pas encore fusionnée dans `main` est signalée « à venir » et apparaît
+automatiquement dès qu'elle est présente.
+
+Pour ajouter ou renommer une visualisation, modifier uniquement la liste `VISUS`
+en haut de [`js/index.js`](js/index.js) (fichier, titre, membre, données, tâches).

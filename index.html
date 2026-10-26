@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spotify · Visualisations</title>
+<link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+<header class="ix-header">
+  <a class="ix-brand" href="#accueil" aria-label="Accueil">
+    <svg class="ix-logo" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="14" width="4" height="12" rx="2" fill="#2a78d6"/>
+      <rect x="11" y="8" width="4" height="18" rx="2" fill="#eb6834"/>
+      <rect x="18" y="4" width="4" height="22" rx="2" fill="#1baf7a"/>
+      <rect x="25" y="11" width="4" height="15" rx="2" fill="#eda100"/>
+    </svg>
+    <span class="ix-brand-text">
+      <span class="ix-brand-title">Spotify · 30 000 titres</span>
+      <span class="ix-brand-sub">Information Visualization · Groupe 3</span>
+    </span>
+  </a>
+  <nav class="ix-tabs" role="tablist" aria-label="Visualisations"></nav>
+</header>
+
+<main class="ix-main">
+  <div class="ix-home" id="ix-home" role="tabpanel" aria-labelledby="ix-tab-accueil">
+
+    <section class="ix-hero">
+      <p class="ix-eyebrow">Dataset « 30000 Spotify Songs » · Kaggle</p>
+      <h1>Explorer le catalogue musical de Spotify</h1>
+      <p class="ix-lead">Un même jeu de données, plusieurs visualisations. Chaque technique est
+        choisie d'après la structure de la donnée qu'elle représente et répond à des tâches
+        précises de ses utilisateurs.</p>
+      <dl class="ix-stats">
+        <div><dt>titres uniques</dt><dd>28 356</dd></div>
+        <div><dt>artistes</dt><dd>10 692</dd></div>
+        <div><dt>genres</dt><dd>6</dd></div>
+        <div><dt>sous-genres</dt><dd>24</dd></div>
+        <div><dt>période</dt><dd>1957–2020</dd></div>
+      </dl>
+      <ul class="ix-genres" aria-label="Couleurs des genres, communes à toutes les vues"></ul>
+    </section>
+
+    <section class="ix-section">
+      <h2 class="ix-section-title">Les visualisations</h2>
+      <div class="ix-cards"></div>
+    </section>
+
+    <section class="ix-section">
+      <h2 class="ix-section-title">Pour qui ?</h2>
+      <div class="ix-profiles"></div>
+    </section>
+
+    <section class="ix-section">
+      <h2 class="ix-section-title">Du CSV brut aux vues</h2>
+      <p class="ix-section-lead">Chaque transformation du notebook <code>scripts/pipeline.ipynb</code> lit un
+        dataset et en produit un nouveau ; chaque vue réalise la dernière transformation,
+        le mapping des données dérivées vers ses variables visuelles.</p>
+      <figure class="ix-flow">
+        <div class="ix-flow-svg"></div>
+        <figcaption>Modèle de référence de la visualisation (Ward, Grinstein &amp; Keim) appliqué au projet.
+          « + » : dataset lu en complément par la vue (détail des titres, nuage de points).
+          Cliquer une vue pour l'ouvrir.</figcaption>
+      </figure>
+    </section>
+
+    <footer class="ix-footer">
+      Amir Benayhia · Arij Lemjid · Maud Marconcini · Adrien Verstraelen —
+      Polytech Nice Sophia, Information Visualization
+    </footer>
+  </div>
+  <div class="ix-frames"></div>
+</main>
+
+<script src="js/index.js"></script>
+</body>
+</html>

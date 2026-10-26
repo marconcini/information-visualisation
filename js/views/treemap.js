@@ -8,6 +8,26 @@
   const BLUE_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
     "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
   const POPULARITY_DOMAIN = [0, 100];
+  const UNKNOWN_ARTIST = "(artiste inconnu)";
+  const EXTRA_GENRE_COLORS = ["#6250d6", "#e34948", "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
+  const COLUMN_ALIASES = {
+    id: ["track_id", "id"],
+    name: ["track_name", "name", "title"],
+    artist: ["artist", "track_artist", "artists"],
+    popularity: ["popularity", "track_popularity"],
+    genre: ["genre", "playlist_genre"],
+    subgenre: ["subgenre", "playlist_subgenre"],
+    decade: ["decade"],
+    year: ["year", "release_year"],
+    date: ["track_album_release_date", "release_date"],
+  };
+  const REQUIRED_COLUMNS = ["genre", "subgenre", "artist", "popularity"];
+  const DARK_TEXT = "#0b0b0b";
+  const LIGHT_TEXT = "#ffffff";
+  const SEP = "\u0001";
+  const DURATION = 750;
+  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", artist: "artiste" };
+  const CHILD_LABEL = { root: "Genres", genre: "Sous-genres", subgenre: "Principaux artistes" };
   const FEATURES = [
     ["danceability", "Dansabilité"],
     ["energy", "Énergie"],
@@ -17,8 +37,10 @@
     ["instrumentalness", "Instrumental"],
     ["liveness", "Live"],
   ];
+  const toNumber = (value) => (value == null || String(value).trim() === "" ? NaN : +value);
   const fmt2 = d3.format(".2f");
-  const featureMeans = (tracks) => Object.fromEntries(FEATURES.map(([key]) => [key, d3.mean(tracks, (t) => +t.row[key]) || 0]));
+  const featureMeans = (tracks) =>
+    Object.fromEntries(FEATURES.map(([key]) => [key, d3.mean(tracks, (t) => toNumber(t.row[key])) ?? null]));
 
   const fmtN = (n) => d3.format(",")(n).replace(/,/g, " ");
   const countOf = (n, one, many) => `${fmtN(n)} ${n > 1 ? many : one}`;
@@ -65,21 +87,7 @@
     return sumUp({ name: "Catalogue", kind: "root", children: genres });
   }
 
-  const UNKNOWN_ARTIST = "(artiste inconnu)";
-  const EXTRA_GENRE_COLORS = ["#6250d6", "#e34948", "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
 
-  const COLUMN_ALIASES = {
-    id: ["track_id", "id"],
-    name: ["track_name", "name", "title"],
-    artist: ["artist", "track_artist", "artists"],
-    popularity: ["popularity", "track_popularity"],
-    genre: ["genre", "playlist_genre"],
-    subgenre: ["subgenre", "playlist_subgenre"],
-    decade: ["decade"],
-    year: ["year", "release_year"],
-    date: ["track_album_release_date", "release_date"],
-  };
-  const REQUIRED_COLUMNS = ["genre", "subgenre", "artist", "popularity"];
 
   function normalizeRows(rows) {
     const columns = rows.columns || Object.keys(rows[0] || {});
@@ -89,18 +97,9 @@
     if (!col.decade && !col.year && !col.date) missing.push("year");
     if (missing.length) return { missing };
 
-    const seen = new Set();
-    let duplicates = 0;
     const out = [];
     for (const r of rows) {
       const id = col.id ? r[col.id] : "";
-      if (id) {
-        if (seen.has(id)) {
-          duplicates += 1;
-          continue;
-        }
-        seen.add(id);
-      }
       const year = col.year ? toNumber(r[col.year]) : col.date ? toNumber(String(r[col.date] || "").slice(0, 4)) : NaN;
       const decade = col.decade ? toNumber(r[col.decade]) : Number.isFinite(year) ? Math.floor(year / 10) * 10 : NaN;
       out.push({
@@ -115,10 +114,20 @@
         decade,
       });
     }
-    return { rows: out, duplicates };
+    return { rows: out };
   }
 
-  const toNumber = (value) => (value == null || String(value).trim() === "" ? NaN : +value);
+  function dropDuplicates(list) {
+    const seen = new Set();
+    const kept = list.filter((t) => {
+      if (!t.id) return true;
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+    return { kept, duplicates: list.length - kept.length };
+  }
+
 
   function parseTrack(row) {
     const popularity = toNumber(row.popularity);
@@ -236,8 +245,6 @@
     return root;
   }
 
-  const DARK_TEXT = "#0b0b0b";
-  const LIGHT_TEXT = "#ffffff";
 
   function luminance(color) {
     const { r, g, b } = d3.rgb(color);
@@ -254,8 +261,9 @@
   }
 
   const textOn = (fill) => (contrastRatio(fill, DARK_TEXT) >= contrastRatio(fill, LIGHT_TEXT) ? DARK_TEXT : LIGHT_TEXT);
-  const titlesRange = (min, max) => (min === max ? `${min} titre${min > 1 ? "s" : ""}` : `${min} à ${max} titres`);
-  const labelOf = (d) => (d.data.kind === "genre" && DataLoader.GENRE_LABELS[d.data.name]) || d.data.name;
+  const titlesRange = (min, max) => (min === max ? countOf(min, "titre", "titres") : `${min} à ${max} titres`);
+  const nameOf = (data) => (data.kind === "genre" && DataLoader.GENRE_LABELS[data.name]) || data.name;
+  const labelOf = (d) => nameOf(d.data);
   const widthOf = (d) => Math.max(0, d.x1 - d.x0);
   const heightOf = (d) => Math.max(0, d.y1 - d.y0);
 
@@ -265,15 +273,10 @@
       .attr("rx", radius);
   }
 
-  const SEP = "\u0001";
-  const DURATION = 750;
   const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const samePath = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
   const isZoomable = (d) => Boolean(d.data.zoomable);
-  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", artist: "artiste" };
-  const CHILD_LABEL = { root: "Genres", genre: "Sous-genres", subgenre: "Principaux artistes" };
   const fmtPct = (v) => `${Math.round(v * 100)}\u00a0%`;
-  const nameOf = (data) => (data.kind === "genre" && DataLoader.GENRE_LABELS[data.name]) || data.name;
   const box = (d) => ({ x: d.x0, y: d.y0, w: Math.max(1, d.x1 - d.x0), h: Math.max(1, d.y1 - d.y0) });
 
   function mount(container) {
@@ -362,7 +365,7 @@
     popInput.max = 100;
     popInput.step = 5;
     popInput.value = 0;
-    popInput.id = `tm-pop-${Math.random().toString(36).slice(2, 8)}`;
+    popInput.id = `tm-pop-${uid}`;
     popLabel.htmlFor = popInput.id;
     popInput.disabled = true;
     const popValue = el("output", "tm-range-value", "chargement des titres…", popControl);
@@ -382,6 +385,7 @@
     fileInput.hidden = true;
     const loadButton = el("button", "tm-more", "Charger un CSV…", dataControl);
     loadButton.type = "button";
+    loadButton.disabled = true;
     loadButton.addEventListener("click", () => fileInput.click());
     const restoreButton = el("button", "tm-more", "Revenir au dataset d'origine", dataControl);
     restoreButton.type = "button";
@@ -391,13 +395,15 @@
 
     const legend = el("div", "tm-legend", null, filters);
 
+    let knownDecades = [];
+
     function decadeCounts(raw) {
       const counts = new Map();
       if (tracks) {
         for (const t of tracks) {
           if (t.popularity >= state.minPopularity) counts.set(t.decade, (counts.get(t.decade) || 0) + 1);
         }
-        for (const [dec] of decadeCounts.all || []) if (!counts.has(dec)) counts.set(dec, 0);
+        for (const [dec] of knownDecades) if (!counts.has(dec)) counts.set(dec, 0);
         return [...counts].sort(([a], [b]) => a - b);
       }
       for (const g of raw.children) {
@@ -407,8 +413,8 @@
           }
         }
       }
-      decadeCounts.all = [...counts].sort(([a], [b]) => a - b);
-      return decadeCounts.all;
+      knownDecades = [...counts].sort(([a], [b]) => a - b);
+      return knownDecades;
     }
 
     function chipLabel(chip, dec, count) {
@@ -737,11 +743,9 @@
     function open(path) {
       const node = findByPath(prepared, path);
       if (!node) return;
-      if (node.children && node.children.length) {
-        zoomTo(path);
-      } else {
-        select(path);
-      }
+      const canExplore = (node.children && node.children.length) || (node.tracks && node.tracks.length);
+      if (canExplore) zoomTo(path);
+      else select(path);
     }
 
     function barList(parent, rows, max, onClick) {
@@ -811,7 +815,7 @@
         const rows = Object.entries(node.dec || {})
           .filter(([dec]) => !state.decades.size || state.decades.has(+dec))
           .sort(([a], [b]) => a - b)
-          .map(([dec, [n]]) => ({ label: `${dec}s`, value: n, color }));
+          .map(([dec, [n]]) => ({ label: `Années ${dec}`, value: n, color }));
         if (rows.length) {
           el("h3", null, "Titres par décennie", card);
           barList(card, rows, d3.max(rows, (r) => r.value));
@@ -877,8 +881,7 @@
       const tree = layout(displayTree(focus, state.limit), width, height);
       currentTree = tree;
       readTheme();
-      const ramp = theme.dark ? [...BLUE_RAMP].reverse() : BLUE_RAMP;
-      popScale = d3.scaleSequential(d3.interpolateRgbBasis(ramp)).domain(POPULARITY_DOMAIN).clamp(true);
+      popScale = d3.scaleSequential(d3.interpolateRgbBasis(BLUE_RAMP)).domain(POPULARITY_DOMAIN).clamp(true);
       renderLegend();
       renderTail(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);
@@ -956,7 +959,7 @@
       const rest = artists.slice(state.limit);
       const text = el("p", "tm-tail-text", null, tailBar);
       if (!rest.length) {
-        el("strong", null, `${countOf(artists.length, "artiste", "artistes")} affichés`, text);
+        el("strong", null, countOf(artists.length, "artiste affiché", "artistes affichés"), text);
         el("span", null, ". L'aire de chaque rectangle correspond à son nombre de titres.", text);
         return;
       }
@@ -967,7 +970,9 @@
       el("strong", null, `${shown.length} artistes affichés sur ${fmtN(artists.length)}`, text);
       el("span", null, `, soit ${fmtPct(shownCount / focus.count)} des titres du sous-genre. ` +
         `La taille des rectangles est calculée entre ces ${shown.length} artistes. ` +
-        `Les ${fmtN(rest.length)} autres ont ${range} chacun (${countOf(restCount, "titre", "titres")}).`, text);
+        (rest.length > 1
+          ? `Les ${fmtN(rest.length)} autres ont ${range} chacun (${countOf(restCount, "titre", "titres")}).`
+          : `Le dernier a ${range}.`), text);
 
       const actions = el("div", "tm-tail-actions", null, tailBar);
       const showMore = (limit) => {
@@ -990,7 +995,7 @@
       const sub = findByPath(prepared, state.focusPath.slice(0, -1));
       const reference = featureMeans(sub.children.flatMap((a) => a.tracks || []));
       const own = featureMeans(artist.tracks);
-      const hasFeatures = FEATURES.every(([key]) => Number.isFinite(toNumber(artist.tracks[0].row[key])));
+      const hasFeatures = FEATURES.some(([key]) => own[key] != null);
 
       const head = el("header", "tm-detail-head", null, detail);
       const title = el("h2", "tm-detail-title", artist.name, head);
@@ -1019,13 +1024,18 @@
           el("span", "tm-prow-label", name, row);
           const track = el("span", "tm-prow-track", null, row);
           const fill = el("span", "tm-prow-fill", null, track);
-          fill.style.width = `${values[key] * 100}%`;
+          const value = values[key];
+          const ref = reference[key];
+          fill.style.width = `${(value ?? 0) * 100}%`;
           fill.style.background = genreColor(artist.genre);
-          const mark = el("span", "tm-prow-ref", null, track);
-          mark.style.left = `${reference[key] * 100}%`;
-          mark.title = `Moyenne de ${sub.name} : ${fmt2(reference[key])}`;
-          el("span", "tm-prow-value", fmt2(values[key]), row);
-          row.setAttribute("aria-label", `${name} : ${fmt2(values[key])}, moyenne du sous-genre ${fmt2(reference[key])}`);
+          if (ref != null) {
+            const mark = el("span", "tm-prow-ref", null, track);
+            mark.style.left = `${ref * 100}%`;
+            mark.title = `Moyenne de ${sub.name} : ${fmt2(ref)}`;
+          }
+          el("span", "tm-prow-value", value == null ? "n/d" : fmt2(value), row);
+          row.setAttribute("aria-label", `${name} : ${value == null ? "non disponible" : fmt2(value)}` +
+            (ref == null ? "" : `, moyenne du sous-genre ${fmt2(ref)}`));
         }
       }
       const showOwn = () => showProfile(own, "Profil audio moyen de l'artiste");
@@ -1262,16 +1272,21 @@
       DataLoader.tracksClean()
         .then((rows) => {
           if (destroyed) return;
-          tracks = rows.map(parseTrack).filter(Boolean);
-          if (tracks.length < rows.length) console.warn(`${rows.length - tracks.length} lignes ignorées (valeurs manquantes ou invalides)`);
-          original = { raw: state.raw, tracks };
+          const list = rows.map(parseTrack).filter(Boolean);
+          if (list.length < rows.length) console.warn(`${rows.length - list.length} lignes ignorées (valeurs manquantes ou invalides)`);
+          original = { raw: state.raw, tracks: list };
+          tracks = list;
           popInput.disabled = false;
           popValue.textContent = String(state.minPopularity);
+          loadButton.disabled = false;
           update();
         })
         .catch((err) => {
           console.error(err);
-          if (!destroyed) popValue.textContent = "titres indisponibles";
+          if (destroyed) return;
+          original = { raw: state.raw, tracks: null };
+          popValue.textContent = "titres indisponibles";
+          loadButton.disabled = false;
         });
     }
 
@@ -1295,7 +1310,7 @@
       popInput.value = 0;
       popInput.disabled = !list;
       popValue.textContent = "0";
-      decadeCounts.all = null;
+      knownDecades = [];
       renderChips();
       update();
     }
@@ -1311,15 +1326,16 @@
         showDataMessage(`${fileName} refusé : colonnes manquantes (${normalized.missing.join(", ")})`, true);
         return;
       }
-      const list = normalized.rows.map(parseTrack).filter(Boolean);
+      const valid = normalized.rows.map(parseTrack).filter(Boolean);
+      const { kept: list, duplicates } = dropDuplicates(valid);
       if (!list.length) {
         showDataMessage(`${fileName} refusé : aucune ligne valide`, true);
         return;
       }
       useDataset(prepareFromTracks(list), list);
-      const ignored = normalized.rows.length - list.length;
+      const ignored = normalized.rows.length - valid.length;
       const parts = [`${fileName} · ${countOf(list.length, "titre", "titres")}`];
-      if (normalized.duplicates) parts.push(`${countOf(normalized.duplicates, "doublon retiré", "doublons retirés")}`);
+      if (duplicates) parts.push(countOf(duplicates, "doublon retiré", "doublons retirés"));
       if (ignored) parts.push(`${countOf(ignored, "ligne ignorée", "lignes ignorées")}`);
       showDataMessage(parts.join(" · "));
       restoreButton.hidden = false;

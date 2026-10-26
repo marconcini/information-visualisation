@@ -37,6 +37,25 @@
   }
 }
 
+/* sombre forcé par le filtre commun */
+:root[data-theme="dark"] {
+  --bg: #111317;
+  --surface: #1a1d23;
+  --surface-2: #23262d;
+  --thumb: #20242b;
+  --text: #ecedf0;
+  --text-2: #aab0b9;
+  --text-3: #7b828c;
+  --line: #2c3038;
+  --edge: #4a4f59;
+  --accent: #6da7ec;
+  --accent-soft: #1b2838;
+  --pending: #e8b850;
+  --pending-soft: #2e2716;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -18px rgba(0, 0, 0, .8);
+  --shadow-hover: 0 2px 4px rgba(0, 0, 0, .35), 0 18px 40px -18px rgba(0, 0, 0, .9);
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
@@ -300,3 +319,23 @@ a.f-view:hover .f-title { fill: var(--accent); }
   .ix-tabs { width: 100%; }
   .ix-frame { min-height: 85vh; }
 }
+
+/* ---- barre de filtre commune (genre) ---- */
+.ix-filter { display: flex; align-items: center; gap: 8px; flex: none; }
+.ix-filter-label {
+  font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2, #6b7280);
+}
+.ix-filter-select {
+  font: inherit; font-size: .9rem; padding: 6px 10px;
+  border: 1px solid var(--edge); border-radius: 9px;
+  background: var(--surface); color: var(--text); cursor: pointer;
+}
+.ix-filter-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ix-filter-reset {
+  font: inherit; font-size: .82rem; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+}
+.ix-filter-reset:hover { border-color: var(--edge); }
+@media (max-width: 720px) { .ix-filter { width: 100%; justify-content: flex-start; } }

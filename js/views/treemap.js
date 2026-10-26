@@ -295,6 +295,7 @@
     let busy = false;
     let renderPending = false;
     let updatePending = false;
+    let applyingFilter = false;   // vrai quand on applique un genre reçu du filtre commun
 
     function requestRender(smooth = false) {
       if (busy) {
@@ -830,6 +831,8 @@
       const keyboard = Boolean(active && root.contains(active) && active.matches(":focus-visible"));
       const previous = state.focusPath;
       state.focusPath = path;
+      // filtre commun : le genre au sommet du chemin devient le genre partagé ("" = catalogue)
+      if (!applyingFilter && window.Filters) Filters.set({ genre: path[0] || "" });
       state.selectedPath = null;
       state.limit = ARTIST_STEP;
       hideTip();
@@ -1261,12 +1264,28 @@
         renderChips();
         update();
         loadTracks();
+        setupSharedFilter();
       })
       .catch((err) => {
         if (!destroyed) showLoadError(err);
       });
 
     let original = null;
+
+    // filtre commun : un genre choisi ailleurs zoome sur ce genre ("" = catalogue)
+    function setupSharedFilter() {
+      if (!window.Filters) return;
+      const apply = (g) => {
+        const target = g ? [g] : [];
+        if (samePath(target, state.focusPath)) return;   // déjà là
+        applyingFilter = true;
+        zoomTo(target);
+        applyingFilter = false;
+      };
+      const start = Filters.get().genre;
+      if (start) apply(start);
+      Filters.onChange(s => apply(s.genre));
+    }
 
     function loadTracks() {
       DataLoader.tracksClean()

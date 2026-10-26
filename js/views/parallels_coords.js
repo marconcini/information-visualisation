@@ -90,10 +90,10 @@ export class ParallelCoordinates {
             .style("min-width", "190px")
             .style("max-width", "280px")
             .style("padding", "12px 14px")
-            .style("background", "#20242b")
-            .style("color", "#e6e7ea")
-            .style("border", "1px solid #444a55")
-            .style("border-left", "4px solid #5b9bd8")
+            .style("background", "var(--surface-soft)")
+            .style("color", "var(--ink)")
+            .style("border", "1px solid var(--line-strong)")
+            .style("border-left", "4px solid var(--accent)")
             .style("border-radius", "8px")
             .style("box-shadow", "0 8px 24px rgba(0, 0, 0, 0.45)")
             .style("font-family", "Arial, sans-serif")
@@ -224,6 +224,7 @@ export class ParallelCoordinates {
                 this.syncGenreCheckboxes();
                 this.syncSubGenreCheckboxes();
                 this.render();
+                this.broadcastGenre();            // prévient les autres vues
             });
 
         subGenreGroups.append("label")
@@ -312,6 +313,37 @@ export class ParallelCoordinates {
         this.syncGenreCheckboxes();
         this.syncSubGenreCheckboxes();
         this.render();
+        this.setupSharedFilter();
+    }
+
+    // filtre commun : applique le genre choisi ailleurs ("" = tous) et
+    // diffuse le genre quand l'utilisateur n'en garde qu'un seul ici.
+    setupSharedFilter() {
+        if (!window.Filters) return;
+        this._applyingFilter = false;
+        const apply = (g) => {
+            this._applyingFilter = true;
+            if (g && this.genres.includes(g)) {
+                this.selectedGenres = new Set([g]);
+                this.selectedSubGenres = new Set(this.subGenresByGenre[g] || []);
+            } else {
+                this.selectedGenres = new Set(this.genres);
+                this.selectedSubGenres = new Set(this.data.map(d => d.subgenre));
+            }
+            if (this.mode === "individual") { this.ensureSingleGenre(); this.ensureSingleSubGenre(); }
+            this.syncGenreCheckboxes();
+            this.syncSubGenreCheckboxes();
+            this.render();
+            this._applyingFilter = false;
+        };
+        const start = Filters.get().genre;
+        if (start) apply(start);
+        Filters.onChange(s => apply(s.genre));
+    }
+
+    broadcastGenre() {
+        if (this._applyingFilter || !window.Filters) return;
+        Filters.set({ genre: this.selectedGenres.size === 1 ? [...this.selectedGenres][0] : "" });
     }
 
     ensureSingleGenre() {
@@ -477,7 +509,7 @@ export class ParallelCoordinates {
                 .style('text-anchor', 'middle')
                 .attr('y', -10)
                 .text(dim => dim)
-                .style('fill', '#e6e7ea')
+                .style('fill', 'var(--ink)')
                 .style('font-weight', 'bold')
                 .style('font-size', '12px');
 
@@ -556,10 +588,10 @@ export class ParallelCoordinates {
                 .style("justify-content", "space-between")
                 .style("gap", "16px")
                 .style("padding", "3px 0")
-                .style("border-top", "1px solid #2c3038");
+                .style("border-top", "1px solid var(--line)");
 
             row.append("span")
-                .style("color", "#a6abb3")
+                .style("color", "var(--muted)")
                 .text(`${label} :`);
             row.append("span")
                 .style("font-weight", "600")

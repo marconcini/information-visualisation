@@ -12,7 +12,31 @@
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <style>
         :root {
-            color-scheme: dark;
+            color-scheme: light dark;
+            --ink: #16181d;
+            --muted: #5a5f66;
+            --line: #e4e4e0;
+            --line-strong: #c3c6cc;
+            --surface: #ffffff;
+            --surface-soft: #f0efeb;
+            --background: #f5f5f2;
+            --accent: #2a78d6;
+        }
+        /* sombre : automatique (système) sauf si on force le clair */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --ink: #e6e7ea;
+                --muted: #a6abb3;
+                --line: #2c3038;
+                --line-strong: #444a55;
+                --surface: #17191d;
+                --surface-soft: #20242b;
+                --background: #17191d;
+                --accent: #5b9bd8;
+            }
+        }
+        /* sombre : forcé par le filtre commun */
+        :root[data-theme="dark"] {
             --ink: #e6e7ea;
             --muted: #a6abb3;
             --line: #2c3038;
@@ -263,6 +287,7 @@
     </style>
     <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
     <script src="js/DataLoader.js"></script>
+    <script src="js/filters.js"></script>
 </head>
 
 <body>

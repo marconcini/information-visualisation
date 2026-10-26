@@ -183,6 +183,30 @@ const THUMBS = {
     }
   }
 
+  // barre de filtre commune : pilote le genre partagé pour TOUTES les vues
+  function setupFilter() {
+    const sel = document.getElementById("ix-genre");
+    const reset = document.getElementById("ix-genre-reset");
+    if (!sel || !window.Filters) return;
+    el("option", null, "Tous les genres", sel).value = "";
+    for (const [name] of GENRES) el("option", null, name, sel).value = name.toLowerCase();
+
+    function reflect(g) { sel.value = g || ""; reset.hidden = !g; }
+    sel.addEventListener("change", () => Filters.set({ genre: sel.value }));
+    reset.addEventListener("click", () => Filters.reset());
+
+    // thème commun : auto -> clair -> sombre -> auto, appliqué à toutes les vues
+    const themeBtn = document.getElementById("ix-theme");
+    const THEME_LABEL = { auto: "Thème : auto", light: "Thème : clair", dark: "Thème : sombre" };
+    const THEME_NEXT = { auto: "light", light: "dark", dark: "auto" };
+    function reflectTheme(t) { if (themeBtn) themeBtn.textContent = THEME_LABEL[t] || THEME_LABEL.auto; }
+    if (themeBtn) themeBtn.addEventListener("click", () => Filters.setTheme(THEME_NEXT[Filters.get().theme] || "light"));
+
+    Filters.onChange(s => { reflect(s.genre); reflectTheme(s.theme); });
+    reflect(Filters.get().genre);
+    reflectTheme(Filters.get().theme);
+  }
+
   function renderTabs() {
     tabs.innerHTML = "";
     for (const v of [{ id: HOME, title: "Accueil" }, ...VISUS]) {
@@ -360,6 +384,7 @@ const THUMBS = {
   window.addEventListener("hashchange", route);
 
   renderGenres();
+  setupFilter();
   Promise.all(VISUS.map((v) => exists(v.file).then((ok) => available.set(v.id, ok)))).then(() => {
     renderTabs();
     renderCards();

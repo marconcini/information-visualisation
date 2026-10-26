@@ -31,7 +31,24 @@ DataLoader.trends().then(rows => {
   setupContext();
   d3.select("#reset-period").on("click", () => setPeriod(null));
   render();
+  setupSharedFilter();
 });
+
+// filtre commun : isole le genre choisi dans une autre vue ("" = tous).
+// La courbe garde sa propre légende en plus ; le filtre partagé a juste priorité.
+function setupSharedFilter() {
+  if (!window.Filters) return;
+  function apply(g) {
+    hiddenGenres.clear();
+    if (g) DataLoader.GENRES.forEach(x => { if (x !== g) hiddenGenres.add(x); });
+    d3.select("#legend").selectAll("button").classed("off", d => hiddenGenres.has(d));
+    if (selected && hiddenGenres.has(selected.genre)) selected = null;
+    render();
+  }
+  const start = Filters.get().genre;
+  if (start) apply(start);
+  Filters.onChange(s => apply(s.genre));
+}
 
 function setupFeatureSelect() {
   const sel = d3.select("#feature-select");

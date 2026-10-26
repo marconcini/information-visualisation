@@ -21,6 +21,12 @@
     </span>
   </a>
   <nav class="ix-tabs" role="tablist" aria-label="Visualisations"></nav>
+  <div class="ix-filter">
+    <label class="ix-filter-label" for="ix-genre">Genre</label>
+    <select id="ix-genre" class="ix-filter-select" aria-label="Filtrer toutes les vues par genre"></select>
+    <button id="ix-genre-reset" class="ix-filter-reset" type="button" hidden>Réinitialiser</button>
+    <button id="ix-theme" class="ix-filter-reset" type="button" aria-label="Changer le thème (toutes les vues)">Thème : auto</button>
+  </div>
 </header>
 
 <main class="ix-main">
@@ -73,6 +79,7 @@
   <div class="ix-frames"></div>
 </main>
 
+<script src="js/filters.js"></script>
 <script src="js/index.js"></script>
 </body>
 </html>

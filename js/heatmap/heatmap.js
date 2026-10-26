@@ -15,9 +15,11 @@ let currentGenre = "", currentMatrix = null, lastPair = null;
 const tip = d3.select("#tip");
 
 function colorScale() {
+  // interpolation Lab (perceptuelle) : les corrélations intermédiaires ressortent
+  // mieux que l'interpolation RGB, sans changer les valeurs mappées.
   return d3.scaleLinear().domain([-1, 0, 1])
     .range([cssVar("--div-neg"), cssVar("--div-mid"), cssVar("--div-pos")])
-    .interpolate(d3.interpolateRgb).clamp(true);
+    .interpolate(d3.interpolateLab).clamp(true);
 }
 function cellText(v) { return d3.hsl(colorScale()(v)).l < 0.55 ? "#ffffff" : "#1b1e24"; }
 
@@ -25,29 +27,52 @@ Promise.all([DataLoader.correlation(), DataLoader.tracksFeatures()]).then(([corr
   FEATURES = corr.features; LABELS = corr.labels; ALL_MATRIX = corr.matrix; ROWS = rows;
   buildGenreFilter();
   paintLegend();
-  renderMatrix(ALL_MATRIX);
+  renderMatrix(currentMatrix || ALL_MATRIX);   // respecte le filtre commun s'il est déjà actif
   setCoverage();
 
-  // thème : re-rendu si l'OS bascule clair/sombre
+  // thème : re-rendu quand les couleurs changent (OS clair/sombre, ou thème forcé par le filtre commun)
+  const reRender = () => {
+    paintLegend(); renderMatrix(currentMatrix);
+    if (lastPair) showScatter(lastPair.i, lastPair.j);
+  };
   if (window.matchMedia) {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener && mq.addEventListener("change", () => {
-      paintLegend(); renderMatrix(currentMatrix);
-      if (lastPair) showScatter(lastPair.i, lastPair.j);
-    });
+    mq.addEventListener && mq.addEventListener("change", reRender);
   }
+  // le filtre commun pose data-theme sur <html> : on redessine pour relire les variables CSS
+  new MutationObserver(reRender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 });
 
 function buildGenreFilter() {
   const sel = d3.select("#genre-filter");
   sel.append("option").attr("value", "").text("Tous les genres");
   DataLoader.GENRES.forEach(g => sel.append("option").attr("value", g).text(DataLoader.GENRE_LABELS[g] || g));
-  sel.on("change", function () {
-    currentGenre = this.value;
-    currentMatrix = currentGenre === "" ? ALL_MATRIX : computeMatrix(rowsForGenre());
+
+  let applying = false;                 // vrai quand on applique un filtre reçu (évite la boucle)
+
+  // (ré)applique un genre à la vue : recalcule la matrice + le nuage
+  function applyGenre(g) {
+    currentGenre = g;
+    sel.property("value", g);
+    currentMatrix = g === "" ? ALL_MATRIX : computeMatrix(rowsForGenre());
     renderMatrix(currentMatrix);
     if (lastPair) showScatter(lastPair.i, lastPair.j);
+  }
+
+  sel.on("change", function () {
+    applyGenre(this.value);
+    if (!applying && window.Filters) Filters.set({ genre: this.value });   // prévient les autres vues
   });
+
+  // filtre commun : état initial + écoute des changements venus des autres vues
+  if (window.Filters) {
+    const start = Filters.get().genre;
+    if (start) applyGenre(start);
+    Filters.onChange(s => {
+      if (s.genre === currentGenre) return;
+      applying = true; applyGenre(s.genre); applying = false;
+    });
+  }
 }
 const rowsForGenre = () => currentGenre === "" ? ROWS : ROWS.filter(r => r.genre === currentGenre);
 

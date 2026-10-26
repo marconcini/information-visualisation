@@ -23,10 +23,20 @@
       --ink:#e9eaed; --ink-soft:#aab0b9; --ink-faint:#7b828c;
       --line:#2b2f37; --line-strong:#3a3f49;
       --accent:#5b9bd8; --accent-soft:#1b2838;
-      --div-neg:#3987e5; --div-mid:#2f323a; --div-pos:#e66767;
+      --div-neg:#4f9dff; --div-mid:#363a44; --div-pos:#ff6b6b;
       --diag:#262a31; --no-data:#262a31;
       --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px -20px rgba(0,0,0,.8);
     }}
+    /* sombre forcé par le filtre commun */
+    :root[data-theme="dark"]{
+      --bg:#131519; --surface:#1d2026; --surface-2:#23262d;
+      --ink:#e9eaed; --ink-soft:#aab0b9; --ink-faint:#7b828c;
+      --line:#2b2f37; --line-strong:#3a3f49;
+      --accent:#5b9bd8; --accent-soft:#1b2838;
+      --div-neg:#4f9dff; --div-mid:#363a44; --div-pos:#ff6b6b;
+      --diag:#262a31; --no-data:#262a31;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px -20px rgba(0,0,0,.8);
+    }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--ink);
@@ -124,6 +134,7 @@
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="js/DataLoader.js"></script>
+  <script src="js/filters.js"></script>
   <script src="js/heatmap/heatmap.js"></script>
 </body>
 </html>

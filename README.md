@@ -19,11 +19,18 @@ data/
 scripts/
   pipeline.ipynb               notebook de transformation des données
 js/
-  core/   dataLoader · store · utils · config
-  views/  parallelCoords · treemap · lines · heatmap · choropleth
-  main.js
-css/style.css
-index.html
+  DataLoader.js    accès unique aux données dérivées (partagé par les vues)
+  filters.js       état commun : filtre par genre + thème, synchronisé entre les vues
+  index.js         hub : onglets, cartes, barre de filtre genre + bouton thème
+  main.js          point d'entrée des coordonnées parallèles
+  heatmap/heatmap.js
+  courbes/courbes.js
+  views/           treemap.js · parallels_coords.js
+css/
+  index.css        hub
+  treemap.css      treemap
+index.html         hub (un onglet par vue)
+heatmap.html · treemap.html · courbes.html · coord-para.html
 ```
 
 ## Pipeline de transformation (étape 1)
@@ -54,8 +61,20 @@ dérivées vers les **variables visuelles** de la technique.
 | Heatmap de corrélation | `correlation.json` | Maud |
 | Carte (bonus) | `countries.json` | équipe |
 
-Les vues partagent un même état (`js/core/store.js`) : un filtre posé dans une vue
-reste actif quand on passe à une autre (**brushing & linking**).
+## État commun (« un seul système »)
+
+Les vues partagent un même état via [`js/filters.js`](js/filters.js) (mémorisé dans
+`localStorage`, synchronisé entre les cadres) :
+
+- **Filtre par genre** — posé dans le hub *ou* dans une vue, il s'applique à **toutes**
+  les vues et reste actif quand on change d'onglet (*brushing & linking*). Chaque vue
+  l'interprète à sa manière : la heatmap recalcule sa matrice, le treemap zoome sur le
+  genre, les courbes l'isolent, les coordonnées parallèles le sélectionnent.
+- **Thème** (auto / clair / sombre) — appliqué à toutes les vues depuis le hub.
+
+Le **genre** est le seul filtre commun à toutes les techniques ; les autres contrôles
+(décennie, popularité, feature, sous-genre…) restent **propres à chaque vue**, car ils
+n'ont pas de sens partagé (p. ex. isoler une seule décennie viderait les courbes).
 
 ## Lancer l'application
 

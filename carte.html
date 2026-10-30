@@ -1,78 +1,23 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Carte des pays d'origine — Spotify</title>
-  <style>
-    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: #1e2126; background: #f4f5f7; }
-    header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #e2e4e8; }
-    header h1 { margin: 0; font-size: 1.3rem; }
-    header p  { margin: 4px 0 0; color: #5a5f66; font-size: .9rem; }
-    main { padding: 24px; }
-    #map svg { max-width: 960px; width: 100%; height: auto; background: #f4f5f7; }
-    .note { color: #8b8e95; font-size: .85rem; font-style: italic; margin: 0 0 12px; }
-    .caveat {
-      background: #fff6e8; border: 1px solid #f0d9ad; border-left: 4px solid #d99a2b;
-      border-radius: 10px; padding: 11px 14px; margin: 0 0 16px;
-      font-size: .9rem; color: #5a4a2e; max-width: 760px;
-    }
-    .caveat b { color: #3d3115; }
-    .detail {
-      max-width: 760px; margin: 14px 0 0; min-height: 1px;
-    }
-    .detail .card {
-      background: #fff; border: 1px solid #e2e4e8; border-left: 4px solid #2f6fb0;
-      border-radius: 12px; padding: 14px 16px;
-    }
-    .detail h3 { margin: 0 0 10px; font-size: 1.05rem; }
-    .detail .stats { display: flex; flex-wrap: wrap; gap: 10px 26px; }
-    .detail .stats div { font-size: .85rem; color: #5a5f66; display: flex; flex-direction: column; }
-    .detail .stats span { font-size: 1.4rem; font-weight: 600; color: #1e2126; }
-    .detail .muted { color: #8b8e95; font-size: .9rem; }
-    .toolbar { margin-bottom: 12px; font-size: .9rem; color: #5a5f66; }
-    .toolbar select {
-      font-size: .9rem; padding: 5px 8px; border: 1px solid #e2e4e8;
-      border-radius: 8px; background: #fff; color: #1e2126;
-    }
-    .tooltip {
-      position: fixed; pointer-events: none; display: none;
-      background: #fff; border: 1px solid #e2e4e8; border-radius: 6px;
-      padding: 6px 9px; font-size: 12px; color: #1e2126;
-      box-shadow: 0 4px 14px rgba(0,0,0,.12); z-index: 10;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte des pays d'origine</title>
+<link rel="stylesheet" href="css/carte.css">
 </head>
-<body>
-  <header>
-    <h1>D'où vient la musique</h1>
-    <p>Pays d'origine des artistes (donnée enrichie) — volume de titres et popularité</p>
-  </header>
+<body class="cm-page">
+<header class="cm-header">
+  <h1>D'où viennent les artistes du catalogue</h1>
+  <p class="cm-lead">Monde → pays → artiste · Tâches : localiser, comparer des volumes, explorer un pays</p>
+  <p class="cm-caveat">Pays d'origine de l'artiste (pays du groupe pour un groupe) d'après MusicBrainz. Ce n'est pas le pays où la musique est écoutée, et la popularité reste le score mondial Spotify du titre.</p>
+</header>
 
-  <main>
-    <div class="caveat">
-      <b>Ce que montre cette carte :</b> le <b>pays d'origine de l'artiste</b> (là où la musique est
-      <b>produite</b>), d'après MusicBrainz — <b>pas</b> le pays où elle est écoutée. Exemple : un titre
-      d'un artiste américain peut être surtout écouté ailleurs (p. ex. en France). La « popularité moyenne »
-      est le <b>score global Spotify</b> du titre, pas sa popularité dans ce pays.
-    </div>
-    <div class="toolbar">
-      <label>Colorer par :
-        <select id="metric-filter">
-          <option value="tracks">Nombre de titres</option>
-          <option value="avg_popularity">Popularité moyenne</option>
-        </select>
-      </label>
-    </div>
-    <p id="coverage" class="note"></p>
-    <div id="map"></div>
-    <div id="detail" class="detail"><p class="muted">Clique sur un pays pour voir son détail.</p></div>
-  </main>
+<div id="carte-view"></div>
 
-  <div id="tip" class="tooltip"></div>
-
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="js/DataLoader.js"></script>
-  <script src="js/carte/carte.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="js/DataLoader.js"></script>
+<script src="js/views/carte.js"></script>
+<script>CarteView.mount(document.getElementById("carte-view"));</script>
 </body>
 </html>

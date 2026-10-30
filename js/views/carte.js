@@ -139,6 +139,7 @@
     let data = null;
     let geo = new Map();
     let busy = false;
+    let pendingGenre;
 
     const filters = el("div", "cm-filters", null, container);
     el("span", "cm-filters-label", "Genre :", filters);
@@ -272,14 +273,30 @@
           b.prepend(dot);
         }
         b.addEventListener("click", () => {
-          if (busy || state.genre === g) return;
-          state.genre = g;
-          state.limit = LIST_STEP;
-          refresh();
-          renderChips();
-          chips.querySelector('[aria-pressed="true"]').focus();
+          selectGenre(g);
+          if (window.Filters) Filters.set({ genre: g || "" });
+          chips.querySelector('[aria-pressed="true"]')?.focus();
         });
       }
+    }
+
+    function selectGenre(g) {
+      const genre = g && DataLoader.GENRES.includes(g) ? g : null;
+      if (busy) {
+        pendingGenre = genre;
+        return;
+      }
+      pendingGenre = undefined;
+      if (state.genre === genre) return;
+      state.genre = genre;
+      state.limit = LIST_STEP;
+      refresh();
+      renderChips();
+    }
+
+    function settle() {
+      busy = false;
+      if (pendingGenre !== undefined) selectGenre(pendingGenre);
     }
 
     function renderCoverage() {
@@ -440,7 +457,7 @@
       renderLegend();
       renderAside();
       t.end().catch(() => {}).then(() => {
-        busy = false;
+        settle();
         aside.querySelector(".cm-aside-title")?.focus();
       });
     }
@@ -468,7 +485,7 @@
       renderLegend();
       renderAside();
       t.end().catch(() => {}).then(() => {
-        busy = false;
+        settle();
         const back = gSymbols.selectAll("circle").filter((c) => c.code === code).node();
         if (back) back.focus();
       });
@@ -838,6 +855,10 @@
           return [f.id, { feature: f, anchor: path.centroid(main), bounds: path.bounds(main) }];
         }));
         message.remove();
+        if (window.Filters) {
+          state.genre = DataLoader.GENRES.includes(Filters.get().genre) ? Filters.get().genre : null;
+          Filters.onChange((s) => selectGenre(s.genre));
+        }
         renderChips();
         refresh();
       })

@@ -15,9 +15,10 @@ data/
     hierarchy.json     (D2)    genre → sous-genre → artiste
     trends.json        (D3)    décennie × genre × feature moyenne
     correlation.json   (D4)    matrice de corrélation (heatmap)
-    countries.json     (D5)    pays d'origine (bonus, à enrichir)
+    countries.json     (D5)    artiste → pays d'origine (MusicBrainz)
 scripts/
   pipeline.ipynb               notebook de transformation des données
+  enrich_countries.py          enrichissement artiste → pays (MusicBrainz)
 js/
   DataLoader.js    accès unique aux données dérivées (partagé par les vues)
   filters.js       état commun : filtre par genre + thème, synchronisé entre les vues
@@ -25,12 +26,13 @@ js/
   main.js          point d'entrée des coordonnées parallèles
   heatmap/heatmap.js
   courbes/courbes.js
-  views/           treemap.js · parallels_coords.js
+  views/           treemap.js · parallels_coords.js · carte.js
 css/
   index.css        hub
   treemap.css      treemap
+  carte.css        carte
 index.html         hub (un onglet par vue)
-heatmap.html · treemap.html · courbes.html · coord-para.html
+heatmap.html · treemap.html · courbes.html · coord-para.html · carte.html
 ```
 
 ## Pipeline de transformation (étape 1)
@@ -48,6 +50,18 @@ jupyter notebook pipeline.ipynb      # exécuter toutes les cellules
 
 Les fichiers de `data/derived/` sont régénérés dans ce dossier.
 
+### Enrichissement : pays d'origine des artistes
+
+Le dataset ne contient pas de pays. `scripts/enrich_countries.py` interroge
+MusicBrainz pour chacun des 10 692 artistes (une requête par seconde, environ 3 h,
+reprise possible grâce au cache) et écrit `data/derived/countries.json`.
+« Pays d'origine » = pays de l'artiste, ou du groupe, renseigné dans MusicBrainz.
+Ce n'est pas le pays d'écoute.
+
+```bash
+python scripts/enrich_countries.py
+```
+
 ## Les visualisations (étape 2)
 
 Chaque vue réalise la **dernière transformation** : le *mapping* des données
@@ -59,7 +73,7 @@ dérivées vers les **variables visuelles** de la technique.
 | Treemap / sunburst | `hierarchy.json` | Arij |
 | Courbes multiples | `trends.json` | Amir |
 | Heatmap de corrélation | `correlation.json` | Maud |
-| Carte (bonus) | `countries.json` | équipe |
+| Carte des pays d'origine (bonus) | `countries.json` + `tracks_clean.csv` | Maud, Arij |
 
 ## État commun (« un seul système »)
 

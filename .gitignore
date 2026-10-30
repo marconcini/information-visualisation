@@ -23,6 +23,7 @@ venv/
 # --- Logs / temporaires ---
 *.log
 tmp/
+scripts/_*_cache.json
 
 # --- Données ---
 # Le dataset brut et les datasets dérivés sont versionnés par défaut

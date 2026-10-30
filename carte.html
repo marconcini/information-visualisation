@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte des pays d'origine</title>
+<link rel="stylesheet" href="css/carte.css">
+</head>
+<body class="cm-page">
+<header class="cm-header">
+  <h1>D'où viennent les artistes du catalogue</h1>
+  <p class="cm-lead">Monde → pays → artiste · Tâches : localiser, comparer des volumes, explorer un pays</p>
+  <p class="cm-caveat">Pays d'origine de l'artiste (pays du groupe pour un groupe) d'après MusicBrainz. Ce n'est pas le pays où la musique est écoutée, et la popularité reste le score mondial Spotify du titre.</p>
+</header>
+
+<div id="carte-view"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="js/DataLoader.js"></script>
+<script src="js/filters.js"></script>
+<script src="js/views/carte.js"></script>
+<script>CarteView.mount(document.getElementById("carte-view"));</script>
+</body>
+</html>

@@ -145,7 +145,7 @@ button.cm-crumb { color: var(--accent); text-decoration: underline; text-underli
   border-bottom: 1px solid var(--grid); }
 .cm-region-value { font-weight: 400; font-variant-numeric: tabular-nums; }
 
-.cm-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 48px; gap: 8px; align-items: center; width: 100%;
+.cm-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 56px; gap: 8px; align-items: center; width: 100%;
   padding: 3px 4px; border: 0; border-radius: 4px; background: none; text-align: left; font-size: 13px; }
 button.cm-row:hover { background: var(--surface-2); }
 .cm-row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

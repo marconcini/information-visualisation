@@ -385,8 +385,8 @@
         .data(ordered, (c) => c.code)
         .join(
           (enter) => enter.append("circle").attr("r", 0),
-          (update) => update,
-          (exit) => exit.transition().duration(duration / 2).attr("r", 0).remove()
+          (update) => update.interrupt("exit").classed("cm-exit", false),
+          (exit) => exit.classed("cm-exit", true).transition("exit").duration(duration / 2).attr("r", 0).remove()
         )
         .attr("class", "cm-symbol")
         .attr("cx", (c) => geo.get(c.code).anchor[0])
@@ -415,7 +415,7 @@
     }
 
     function scaleSymbols(k, animate) {
-      const circles = gSymbols.selectAll("circle");
+      const circles = gSymbols.selectAll("circle:not(.cm-exit)");
       (animate ? circles.transition().duration(duration) : circles)
         .attr("r", (c) => (state.country ? 0 : radius(c.count) / k));
       gLabels.selectAll("text")

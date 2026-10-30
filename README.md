@@ -15,12 +15,13 @@ data/
     hierarchy.json     (D2)    genre → sous-genre → artiste
     trends.json        (D3)    décennie × genre × feature moyenne
     correlation.json   (D4)    matrice de corrélation (heatmap)
-    countries.json     (D5)    pays d'origine (bonus, à enrichir)
+    countries.json     (D5)    artiste → pays d'origine (MusicBrainz)
 scripts/
   pipeline.ipynb               notebook de transformation des données
+  enrich_countries.py          enrichissement artiste → pays (MusicBrainz)
 js/
   core/   dataLoader · store · utils · config
-  views/  parallelCoords · treemap · lines · heatmap · choropleth
+  views/  parallelCoords · treemap · lines · heatmap · carte
   main.js
 css/style.css
 index.html
@@ -41,6 +42,18 @@ jupyter notebook pipeline.ipynb      # exécuter toutes les cellules
 
 Les fichiers de `data/derived/` sont régénérés dans ce dossier.
 
+### Enrichissement : pays d'origine des artistes
+
+Le dataset ne contient pas de pays. `scripts/enrich_countries.py` interroge
+MusicBrainz pour chacun des 10 692 artistes (une requête par seconde, environ 3 h,
+reprise possible grâce au cache) et écrit `data/derived/countries.json`.
+« Pays d'origine » = pays de l'artiste, ou du groupe, renseigné dans MusicBrainz.
+Ce n'est pas le pays d'écoute.
+
+```bash
+python scripts/enrich_countries.py
+```
+
 ## Les visualisations (étape 2)
 
 Chaque vue réalise la **dernière transformation** : le *mapping* des données
@@ -52,7 +65,7 @@ dérivées vers les **variables visuelles** de la technique.
 | Treemap / sunburst | `hierarchy.json` | Arij |
 | Courbes multiples | `trends.json` | Amir |
 | Heatmap de corrélation | `correlation.json` | Maud |
-| Carte (bonus) | `countries.json` | équipe |
+| Carte des pays d'origine (bonus) | `countries.json` + `tracks_clean.csv` | Maud, Arij |
 
 Les vues partagent un même état (`js/core/store.js`) : un filtre posé dans une vue
 reste actif quand on passe à une autre (**brushing & linking**).

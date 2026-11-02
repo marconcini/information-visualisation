@@ -16,6 +16,8 @@ data/
     trends.json        (D3)    décennie × genre × feature moyenne
     correlation.json   (D4)    matrice de corrélation (heatmap)
     countries.json     (D5)    artiste → pays d'origine (MusicBrainz)
+  samples/                     extraits CSV à charger dans la treemap
+  world.geojson                fond de carte (pays, codes ISO alpha-3)
 scripts/
   pipeline.ipynb               notebook de transformation des données
   enrich_countries.py          enrichissement artiste → pays (MusicBrainz)
@@ -40,7 +42,7 @@ heatmap.html · treemap.html · courbes.html · coord-para.html · carte.html
 Les données brutes sont transformées en datasets dérivés par
 [`scripts/pipeline.ipynb`](scripts/pipeline.ipynb) — chaque étape lit un dataset et
 en produit un nouveau (nettoyage → normalisation → hiérarchie → agrégats →
-corrélation → pays).
+corrélation). Le pays d'origine vient d'un script à part (voir plus bas).
 
 ```bash
 pip install pandas numpy jupyter
@@ -56,7 +58,11 @@ Le dataset ne contient pas de pays. `scripts/enrich_countries.py` interroge
 MusicBrainz pour chacun des 10 692 artistes (une requête par seconde, environ 3 h,
 reprise possible grâce au cache) et écrit `data/derived/countries.json`.
 « Pays d'origine » = pays de l'artiste, ou du groupe, renseigné dans MusicBrainz.
-Ce n'est pas le pays d'écoute.
+Ce n'est pas le pays d'écoute. Quand MusicBrainz ne donne qu'une ville, on remonte
+jusqu'au pays (Londres → Angleterre → Royaume-Uni).
+
+Résultat : 7 973 artistes sur 10 692 ont un pays, soit 85 % des titres. Les autres
+ne sont pas retirés : la carte les compte dans un bloc « Sans pays ».
 
 ```bash
 python scripts/enrich_countries.py
@@ -70,9 +76,9 @@ dérivées vers les **variables visuelles** de la technique.
 | Vue | Dataset | Membre |
 |---|---|---|
 | Coordonnées parallèles | `tracks_features.csv` | Adrien |
-| Treemap / sunburst | `hierarchy.json` | Arij |
-| Courbes multiples | `trends.json` | Amir |
-| Heatmap de corrélation | `correlation.json` | Maud |
+| Treemap zoomable | `hierarchy.json` + `tracks_clean.csv` | Arij |
+| Courbes multiples | `trends.json` + `tracks_clean.csv` | Amir |
+| Heatmap de corrélation | `correlation.json` + `tracks_features.csv` | Maud |
 | Carte des pays d'origine (bonus) | `countries.json` + `tracks_clean.csv` | Maud, Arij |
 
 ## État commun (« un seul système »)
@@ -83,7 +89,8 @@ Les vues partagent un même état via [`js/filters.js`](js/filters.js) (mémoris
 - **Filtre par genre** — posé dans le hub *ou* dans une vue, il s'applique à **toutes**
   les vues et reste actif quand on change d'onglet (*brushing & linking*). Chaque vue
   l'interprète à sa manière : la heatmap recalcule sa matrice, le treemap zoome sur le
-  genre, les courbes l'isolent, les coordonnées parallèles le sélectionnent.
+  genre, les courbes l'isolent, les coordonnées parallèles le sélectionnent, la carte
+  ne garde que les titres de ce genre.
 - **Thème** (auto / clair / sombre) — appliqué à toutes les vues depuis le hub.
 
 Le **genre** est le seul filtre commun à toutes les techniques ; les autres contrôles

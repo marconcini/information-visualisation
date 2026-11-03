@@ -4,6 +4,8 @@ Visualisations interactives en **D3.js** à partir du dataset **« 30000 Spotify
 ([Kaggle](https://www.kaggle.com/datasets/joebeachcapital/30000-spotify-songs)).
 Un même dataset, **4 visualisations coordonnées** (+ 1 bonus).
 
+Le **rapport** du projet (utilisateurs, données et pipeline, approche, une page par visualisation) est dans [`docs/`](docs/README.md).
+
 ## Structure
 
 ```

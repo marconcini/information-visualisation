@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const ARTIST_STEP = 30;
+  const TIERS = [[10, Infinity, "10 titres et plus"], [5, 9, "5 à 9 titres"], [2, 4, "2 à 4 titres"], [1, 1, "1 titre"]];
+  const MIN_TIERED = 40;
+  const MAX_GROUP = 80;
   const SUMMARY_ARTISTS = 5;
   const CONCENTRATION = 10;
   const HEADER = 22;
@@ -26,8 +28,8 @@
   const LIGHT_TEXT = "#ffffff";
   const SEP = "\u0001";
   const DURATION = 750;
-  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", artist: "artiste" };
-  const CHILD_LABEL = { root: "Genres", genre: "Sous-genres", subgenre: "Principaux artistes" };
+  const KIND_LABEL = { root: "catalogue", genre: "genre", subgenre: "sous-genre", tier: "tranche", letters: "groupe", artist: "artiste" };
+  const CHILD_LABEL = { root: "Genres", genre: "Sous-genres", subgenre: "Tranches", tier: "Groupes alphabétiques" };
   const FEATURES = [
     ["danceability", "Dansabilité"],
     ["energy", "Énergie"],
@@ -71,15 +73,59 @@
     return node;
   }
 
+  const byCount = (list) => list.slice().sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
+  const initialOf = (name) => {
+    const c = normalizeText(name).charAt(0).toUpperCase();
+    return c >= "A" && c <= "Z" ? c : "#";
+  };
+
+  function byLetters(artists, genre) {
+    const sorted = artists.slice().sort((a, b) =>
+      d3.ascending(initialOf(a.name), initialOf(b.name)) || d3.ascending(normalizeText(a.name), normalizeText(b.name)));
+    const groups = [];
+    let current = [], first = null, last = null;
+    const flush = () => {
+      if (!current.length) return;
+      const list = byCount(current);
+      groups.push(sumUp({ name: first === last ? first : `${first} à ${last}`, kind: "letters", genre, order: groups.length, artists: list, children: list }));
+      current = [];
+    };
+    for (const [letter, list] of d3.groups(sorted, (a) => initialOf(a.name))) {
+      if (current.length && current.length + list.length > MAX_GROUP) flush();
+      if (!current.length) first = letter;
+      current.push(...list);
+      last = letter;
+    }
+    flush();
+    return groups;
+  }
+
+  function nestArtists(artists, genre) {
+    if (artists.length <= MIN_TIERED) return artists;
+    return TIERS.map(([min, max, name], order) => {
+      const list = artists.filter((a) => a.count >= min && a.count <= max);
+      if (!list.length) return null;
+      return sumUp({ name, kind: "tier", genre, order, artists: list, children: list.length > MAX_GROUP ? byLetters(list, genre) : list });
+    }).filter(Boolean);
+  }
+
+  function subgenreNode(name, genre, artists) {
+    const sorted = byCount(artists);
+    return sumUp({ name, kind: "subgenre", genre, artists: sorted, children: nestArtists(sorted, genre) });
+  }
+
+  function eachArtist(node, path, fn) {
+    for (const c of node.children || []) {
+      if (c.kind === "artist") fn(c, [...path, c.name]);
+      else eachArtist(c, [...path, c.name], fn);
+    }
+  }
+
   function prepare(raw, { decades = new Set() } = {}) {
     const genres = raw.children.map((g) => {
-      const subgenres = g.children.map((s) => {
-        const artists = s.children
-          .map((a) => ({ ...aggregateArtist(a, decades), genre: g.name }))
-          .filter((a) => a.count > 0)
-          .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
-        return sumUp({ name: s.name, kind: "subgenre", genre: g.name, children: artists });
-      }).filter((s) => s.count > 0);
+      const subgenres = g.children.map((s) => subgenreNode(s.name, g.name, s.children
+        .map((a) => ({ ...aggregateArtist(a, decades), genre: g.name }))
+        .filter((a) => a.count > 0))).filter((s) => s.count > 0);
 
       return sumUp({ name: g.name, kind: "genre", genre: g.name, children: subgenres });
     }).filter((g) => g.count > 0);
@@ -170,12 +216,8 @@
     const kept = tracks.filter((t) => (!decades.size || decades.has(t.decade)) && t.popularity >= minPopularity);
     const grouped = d3.group(kept, (t) => t.genre, (t) => t.subgenre, (t) => t.artist);
     const genres = [...grouped].map(([genre, subs]) => {
-      const subgenres = [...subs].map(([subgenre, artists]) => {
-        const children = [...artists]
-          .map(([name, list]) => artistFromTracks(name, genre, list))
-          .sort((a, b) => d3.descending(a.count, b.count) || d3.ascending(a.name, b.name));
-        return sumUp({ name: subgenre, kind: "subgenre", genre, children });
-      });
+      const subgenres = [...subs].map(([subgenre, artists]) =>
+        subgenreNode(subgenre, genre, [...artists].map(([name, list]) => artistFromTracks(name, genre, list))));
       return sumUp({ name: genre, kind: "genre", genre, children: subgenres });
     });
     return sumUp({ name: "Catalogue", kind: "root", children: genres });
@@ -183,14 +225,27 @@
 
   const popMean = (d) => (d.count ? d.popSum / d.count : null);
 
-  function findByPath(tree, path) {
+  function resolve(tree, path) {
     let node = tree;
+    const real = [];
     for (const name of path) {
-      node = (node.children || []).find((c) => c.name === name);
-      if (!node) return null;
+      const kids = node.children || [];
+      let next = kids.find((c) => c.name === name);
+      if (!next && kids.length && kids[0].kind === "letters") {
+        const group = kids.find((g) => g.children.some((c) => c.name === name));
+        if (group) {
+          real.push(group.name);
+          next = group.children.find((c) => c.name === name);
+        }
+      }
+      if (!next) return null;
+      real.push(name);
+      node = next;
     }
-    return node;
+    return { node, path: real };
   }
+
+  const findByPath = (tree, path) => resolve(tree, path)?.node || null;
 
   function display(node) {
     return {
@@ -199,12 +254,14 @@
       genre: node.genre,
       count: node.count,
       popSum: node.popSum,
+      order: node.order,
+      artists: node.artists ? node.artists.length : null,
       zoomable: Boolean((node.children && node.children.length) || (node.tracks && node.tracks.length)),
     };
   }
 
   function summarize(sub, parent) {
-    const artists = sub.children;
+    const artists = sub.artists;
     return {
       share: parent.count ? sub.count / parent.count : 0,
       artists: artists.length,
@@ -215,10 +272,10 @@
     };
   }
 
-  function displayTree(focus, limit) {
+  function displayTree(focus) {
     const kids = focus.children || [];
-    if (focus.kind === "subgenre") {
-      return { ...display(focus), children: kids.slice(0, limit).map(display) };
+    if (focus.kind !== "root" && focus.kind !== "genre") {
+      return { ...display(focus), children: kids.map((c) => (c.artists ? { ...display(c), children: c.artists.map(display) } : display(c))) };
     }
     if (focus.kind === "genre") {
       return {
@@ -232,14 +289,15 @@
   function layout(data, width, height) {
     const root = d3.hierarchy(data)
       .sum((d) => (d.children ? 0 : d.count))
-      .sort((a, b) => b.value - a.value || d3.ascending(a.data.name, b.data.name));
+      .sort((a, b) => (a.data.order != null && b.data.order != null ? a.data.order - b.data.order : 0)
+        || b.value - a.value || d3.ascending(a.data.name, b.data.name));
 
     d3.treemap()
       .tile(d3.treemapSquarify.ratio(1))
       .size([width, height])
       .paddingOuter((d) => (d.depth === 0 ? 0 : 3))
       .paddingTop((d) => (d.depth === 0 ? 0 : d.depth === 1 && d.children ? HEADER : 3))
-      .paddingInner((d) => (d.depth === 0 ? 6 : 2))
+      .paddingInner((d) => (d.depth === 0 ? 6 : d.children && d.children.length > 60 ? 1 : 2))
       .round(true)(root);
 
     return root;
@@ -261,7 +319,6 @@
   }
 
   const textOn = (fill) => (contrastRatio(fill, DARK_TEXT) >= contrastRatio(fill, LIGHT_TEXT) ? DARK_TEXT : LIGHT_TEXT);
-  const titlesRange = (min, max) => (min === max ? countOf(min, "titre", "titres") : `${min} à ${max} titres`);
   const nameOf = (data) => (data.kind === "genre" && DataLoader.GENRE_LABELS[data.name]) || data.name;
   const labelOf = (d) => nameOf(d.data);
   const widthOf = (d) => Math.max(0, d.x1 - d.x0);
@@ -286,7 +343,6 @@
       decades: new Set(),
       minPopularity: 0,
       selectedPath: null,
-      limit: ARTIST_STEP,
       colorBy: "genre",
     };
     let prepared = null;
@@ -295,7 +351,9 @@
     let busy = false;
     let renderPending = false;
     let updatePending = false;
-    let applyingFilter = false;   // vrai quand on applique un genre reçu du filtre commun
+    let applyingFilter = false;
+    let pendingGenre = null;
+    let applyGenre = null;   // vrai quand on applique un genre reçu du filtre commun
 
     function requestRender(smooth = false) {
       if (busy) {
@@ -643,9 +701,9 @@
       const found = [];
       for (const g of prepared.children) {
         for (const sub of g.children) {
-          sub.children.forEach((artist, rank) => {
+          eachArtist(sub, [g.name, sub.name], (artist, path) => {
             const at = normalizeText(artist.name).indexOf(q);
-            if (at >= 0) found.push({ artist, rank, starts: at === 0, path: [g.name, sub.name, artist.name] });
+            if (at >= 0) found.push({ artist, starts: at === 0, path });
           });
         }
       }
@@ -695,10 +753,8 @@
         zoomTo(m.path);
         return;
       }
-      zoomTo(m.path.slice(0, 2));
-      state.limit = Math.max(ARTIST_STEP, Math.ceil((m.rank + 1) / ARTIST_STEP) * ARTIST_STEP);
+      zoomTo(m.path.slice(0, -1));
       select(m.path);
-      requestRender();
     }
 
     searchInput.addEventListener("input", () => {
@@ -732,7 +788,8 @@
 
     function highlight() {
       const key = state.selectedPath ? state.selectedPath.join(SEP) : null;
-      svg.selectAll("g.tm-head, g.tm-cell").classed("is-selected", (d) => key !== null && keyOf(d) === key);
+      const realKey = (d) => (resolve(prepared, pathOf(d))?.path || pathOf(d)).join(SEP);
+      svg.selectAll("g.tm-head, g.tm-cell").classed("is-selected", (d) => key !== null && prepared && realKey(d) === key);
     }
 
     function rectFor(path) {
@@ -789,10 +846,10 @@
       stat("Titres", fmtN(node.count));
       if (share != null) stat(`Part de ${nameOf(parent)}`, fmtPct(share));
       if (pop != null) stat("Popularité moyenne des titres", String(Math.round(pop)));
-      if (node.kind === "subgenre") {
-        stat("Artistes", fmtN(node.children.length));
-        if (node.children.length > CONCENTRATION) {
-          const top = d3.sum(node.children.slice(0, CONCENTRATION), (a) => a.count);
+      if (node.artists) {
+        stat("Artistes", fmtN(node.artists.length));
+        if (node.kind === "subgenre" && node.artists.length > CONCENTRATION) {
+          const top = d3.sum(node.artists.slice(0, CONCENTRATION), (a) => a.count);
           stat(`Part des ${CONCENTRATION} premiers`, fmtPct(top / node.count));
         }
       }
@@ -801,9 +858,9 @@
 
       if (node.children && node.children.length) {
         const kids = node.children.slice()
-          .sort((a, b) => b.count - a.count)
+          .sort((a, b) => (a.order != null && b.order != null ? a.order - b.order : b.count - a.count))
           .slice(0, 8);
-        el("h3", null, CHILD_LABEL[node.kind], card);
+        el("h3", null, node.children[0].kind === "artist" ? "Principaux artistes" : CHILD_LABEL[node.kind], card);
         barList(card, kids.map((c) => ({
           label: nameOf(c),
           value: c.count,
@@ -834,7 +891,6 @@
       // filtre commun : le genre au sommet du chemin devient le genre partagé ("" = catalogue)
       if (!applyingFilter && window.Filters) Filters.set({ genre: path[0] || "" });
       state.selectedPath = null;
-      state.limit = ARTIST_STEP;
       hideTip();
       renderNav();
       renderCard();
@@ -881,12 +937,12 @@
       }
       status.hidden = true;
 
-      const tree = layout(displayTree(focus, state.limit), width, height);
+      const tree = layout(displayTree(focus), width, height);
       currentTree = tree;
       readTheme();
       popScale = d3.scaleSequential(d3.interpolateRgbBasis(BLUE_RAMP)).domain(POPULARITY_DOMAIN).clamp(true);
       renderLegend();
-      renderTail(focus);
+      renderNote(focus);
       svg.attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height);
 
       const old = svg.select("g.tm-layer");
@@ -941,6 +997,11 @@
         busy = false;
         layer.attr("transform", null);
         if (anim.keyboard) restoreFocus(layer, anim);
+        if (pendingGenre !== null && applyGenre) {
+          const g = pendingGenre;
+          pendingGenre = null;
+          applyGenre(g);
+        }
         if (updatePending) {
           updatePending = false;
           renderPending = false;
@@ -952,51 +1013,25 @@
       });
     }
 
-    function renderTail(focus) {
+    function renderNote(focus) {
       tailBar.innerHTML = "";
-      const artists = focus.kind === "subgenre" ? focus.children : [];
-      tailBar.hidden = artists.length === 0;
-      if (!artists.length) return;
-
-      const shown = artists.slice(0, state.limit);
-      const rest = artists.slice(state.limit);
+      const kids = focus.children || [];
+      const grouped = kids.length > 0 && (kids[0].kind === "tier" || kids[0].kind === "letters");
+      tailBar.hidden = !grouped;
+      if (!grouped) return;
       const text = el("p", "tm-tail-text", null, tailBar);
-      if (!rest.length) {
-        el("strong", null, countOf(artists.length, "artiste affiché", "artistes affichés"), text);
-        el("span", null, ". L'aire de chaque rectangle correspond à son nombre de titres.", text);
-        return;
-      }
-
-      const shownCount = d3.sum(shown, (a) => a.count);
-      const restCount = d3.sum(rest, (a) => a.count);
-      const range = titlesRange(d3.min(rest, (a) => a.count), d3.max(rest, (a) => a.count));
-      el("strong", null, `${shown.length} artistes affichés sur ${fmtN(artists.length)}`, text);
-      el("span", null, `, soit ${fmtPct(shownCount / focus.count)} des titres du sous-genre. ` +
-        `La taille des rectangles est calculée entre ces ${shown.length} artistes. ` +
-        (rest.length > 1
-          ? `Les ${fmtN(rest.length)} autres ont ${range} chacun (${countOf(restCount, "titre", "titres")}).`
-          : `Le dernier a ${range}.`), text);
-
-      const actions = el("div", "tm-tail-actions", null, tailBar);
-      const showMore = (limit) => {
-        state.limit = limit;
-        hideTip();
-        requestRender();
-      };
-      const more = el("button", "tm-more", `Afficher ${Math.min(ARTIST_STEP, rest.length)} de plus`, actions);
-      more.type = "button";
-      more.addEventListener("click", () => showMore(state.limit + ARTIST_STEP));
-      const all = el("button", "tm-more", `Tout afficher (${fmtN(artists.length)})`, actions);
-      all.type = "button";
-      all.addEventListener("click", () => showMore(Infinity));
+      el("strong", null, `${countOf(focus.artists.length, "artiste", "artistes")} dessinés`, text);
+      el("span", null, kids[0].kind === "tier"
+        ? ", rangés en tranches selon leur nombre de titres. L'aire de chaque rectangle correspond à son nombre de titres. Cliquer une tranche pour lire ses artistes."
+        : ", regroupés par ordre alphabétique pour rester lisibles. Cliquer un groupe pour lire ses artistes.", text);
     }
 
     function renderDetail(artist) {
       detail.innerHTML = "";
       detail.hidden = false;
       detail.style.borderTopColor = genreColor(artist.genre);
-      const sub = findByPath(prepared, state.focusPath.slice(0, -1));
-      const reference = featureMeans(sub.children.flatMap((a) => a.tracks || []));
+      const sub = findByPath(prepared, state.focusPath.slice(0, 2));
+      const reference = featureMeans(sub.artists.flatMap((a) => a.tracks || []));
       const own = featureMeans(artist.tracks);
       const hasFeatures = FEATURES.some(([key]) => own[key] != null);
 
@@ -1068,8 +1103,9 @@
     }
 
     function activate(d) {
-      if (isZoomable(d)) zoomTo(pathOf(d), box(d));
-      else select(pathOf(d));
+      const path = (prepared && resolve(prepared, pathOf(d))?.path) || pathOf(d);
+      if (isZoomable(d)) zoomTo(path, box(d));
+      else select(path);
     }
 
     function summaryRows(d) {
@@ -1166,7 +1202,9 @@
 
       groups.select(".tm-group-label")
         .attr("fill", (d) => (d.children ? "var(--text)" : ink(d)))
-        .text((d) => truncate(`${labelOf(d)} · ${fmtN(d.value)}`, Math.floor((widthOf(d) - 12) / 7)));
+        .text((d) => truncate(d.children && d.data.artists != null
+          ? `${labelOf(d)} · ${countOf(d.data.artists, "artiste", "artistes")}`
+          : `${labelOf(d)} · ${fmtN(d.value)}`, Math.floor((widthOf(d) - 12) / 7)));
       move(groups.select(".tm-group-label"))
         .attr("x", (d) => d.x0 + (d.data.summary ? 8 : 6))
         .attr("y", (d) => d.y0 + (d.children ? HEADER / 2 + 4 : d.data.summary ? 22 : 16));
@@ -1276,8 +1314,12 @@
     function setupSharedFilter() {
       if (!window.Filters) return;
       const apply = (g) => {
+        if (busy) {
+          pendingGenre = g;
+          return;
+        }
+        if ((state.focusPath[0] || "") === g) return;
         const target = g ? [g] : [];
-        if (samePath(target, state.focusPath)) return;   // déjà là
         applyingFilter = true;
         zoomTo(target);
         applyingFilter = false;
@@ -1285,6 +1327,7 @@
       const start = Filters.get().genre;
       if (start) apply(start);
       Filters.onChange(s => apply(s.genre));
+      applyGenre = apply;
     }
 
     function loadTracks() {
@@ -1325,7 +1368,6 @@
       state.selectedPath = null;
       state.decades = new Set();
       state.minPopularity = 0;
-      state.limit = ARTIST_STEP;
       popInput.value = 0;
       popInput.disabled = !list;
       popValue.textContent = "0";

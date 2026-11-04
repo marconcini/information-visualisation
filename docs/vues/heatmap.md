@@ -1,6 +1,6 @@
 # Heatmap de corrélation : quelles caractéristiques vont ensemble ?
 
-[← Sommaire](../README.md)
+[← Sommaire](../../README.md)
 
 **Auteure : Maud Marconcini**
 

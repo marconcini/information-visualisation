@@ -1,6 +1,6 @@
 # Treemap zoomable : genre → sous-genre → artiste
 
-[← Sommaire](../README.md)
+[← Sommaire](../../README.md)
 
 **Auteure : Arij Lemjid**
 

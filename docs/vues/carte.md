@@ -1,6 +1,6 @@
 # Carte des pays d'origine (bonus) : monde → pays → artiste
 
-[← Sommaire](../README.md)
+[← Sommaire](../../README.md)
 
 **Auteures : Maud Marconcini et Arij Lemjid**
 Maud a fait la première version (choroplèthe et premier script d'enrichissement sur 800 artistes). Arij a étendu l'enrichissement à tous les artistes et refait la vue avec des symboles proportionnels et un zoom sémantique.

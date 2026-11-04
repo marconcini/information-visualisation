@@ -1,6 +1,6 @@
 # Coordonnées parallèles : le profil audio des genres et des titres
 
-[← Sommaire](../README.md)
+[← Sommaire](../../README.md)
 
 **Auteur : Adrien Verstraelen**
 

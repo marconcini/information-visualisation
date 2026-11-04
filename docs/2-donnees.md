@@ -1,6 +1,6 @@
 # Le dataset et son traitement
 
-[← Sommaire](README.md)
+[← Sommaire](../README.md)
 
 ## 1. Le dataset d'origine
 

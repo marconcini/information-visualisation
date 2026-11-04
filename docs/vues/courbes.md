@@ -1,6 +1,6 @@
 # Courbes multiples : l'évolution des genres par décennie
 
-[← Sommaire](../README.md)
+[← Sommaire](../../README.md)
 
 **Auteur : Amir Benayhia**
 

@@ -1,6 +1,6 @@
 # Approche de visualisation et coordination des vues
 
-[← Sommaire](README.md)
+[← Sommaire](../README.md)
 
 ![Page d'accueil](img/index-1-accueil.png)
 

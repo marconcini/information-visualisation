@@ -1,6 +1,6 @@
 # Utilisateurs et objectifs
 
-[← Sommaire](README.md)
+[← Sommaire](../README.md)
 
 Nous avons défini trois profils d'utilisateurs. Pour chacun, nous avons listé ses objectifs, les questions concrètes qu'il se pose, puis les tâches de visualisation qui en découlent. Ce sont ces tâches qui ont guidé le choix des techniques, et non l'inverse.
 

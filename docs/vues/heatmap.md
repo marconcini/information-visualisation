@@ -25,7 +25,7 @@ La matrice « tous genres » est pré-calculée dans le pipeline (D4). Le recalc
 
 ## 2. Pourquoi une heatmap (et pas autre chose)
 
-Le choix découle de la **structure de la donnée** : une **matrice carrée** de valeurs. La heatmap est la technique faite pour ça. Mais le point important — celui que le jury attend — est de comprendre ses **avantages par rapport aux alternatives** :
+Le choix découle de la **structure de la donnée** : une **matrice carrée** de valeurs. La heatmap est la technique faite pour ça. Mais le point important est de comprendre ses **avantages par rapport aux alternatives** :
 
 | Technique envisageable | Pourquoi écartée |
 |---|---|
@@ -74,7 +74,7 @@ Pourquoi ce détail est essentiel : un même coefficient peut cacher des formes 
 
 *Scénario (journaliste) :* « Les morceaux plus forts sont-ils plus énergiques ? » La case la plus rouge est **energy × loudness (r = 0,68)**. Le nuage confirme une relation nette et régulière : un sujet d'article solide. La relation la plus négative est **energy × acousticness (r = −0,55)** : les titres acoustiques sont plus calmes.
 
-*Scénario (analyste label) :* « Peut-on prédire la popularité à partir du profil audio ? » Toute la ligne **« Popularity » est presque grise** : aucune corrélation ne dépasse **0,12** en valeur absolue. Conclusion exploitable et contre-intuitive : dans ce dataset, **la popularité d'un titre ne s'explique pas par ses caractéristiques audio** — inutile de miser sur une « recette sonore » pour viser le succès.
+*Scénario (analyste label) :* « Peut-on prédire la popularité à partir du profil audio ? » Toute la ligne **« Popularity » est presque grise** : aucune corrélation ne dépasse **0,13** en valeur absolue (la plus forte est instrumentalness, −0,124). Conclusion exploitable et contre-intuitive : dans ce dataset, **la popularité d'un titre ne s'explique pas par ses caractéristiques audio** — inutile de miser sur une « recette sonore » pour viser le succès.
 
 ### 4.3 Filtrer par genre
 

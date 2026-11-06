@@ -23,14 +23,16 @@ Les données sont **temporelles** : pour chaque genre et chaque décennie (des a
 
 ## 3. Utilisateurs et tâches
 
-- **Journaliste** : trouver une évolution à raconter (« le rock est devenu plus électrique »).
-- **Analyste label** : voir quels genres changent et dans quel sens.
+- **Journaliste** : trouver une évolution à raconter (« le rock est devenu plus électrique »), comparer la trajectoire de deux genres, situer un pic ou un creux.
+- **Mélomane** : vérifier une intuition (« le R&B des années 1990 était-il plus positif et plus dansant qu'aujourd'hui ? »).
+- **Analyste label** (usage secondaire) : voir quels genres changent et dans quel sens.
 
 | Tâche | Comment la vue la supporte |
 |---|---|
 | Tendance | Une courbe par genre, décennie par décennie |
 | Comparer dans le temps | Axe Y commun à tous les genres, qui ne change pas quand on en masque un |
-| Extrêmes | Au survol d'une courbe, triangles ▲ max et ▼ min avec leur valeur (décennies fiables seulement) |
+| Déterminer une plage | Frise pour zoomer sur une période ; les triangles ▲ ▼ situent le pic et le creux de chaque genre sur cette période |
+| Extrêmes | Triangles ▲ max et ▼ min sur chaque courbe (décennies d'au moins 30 titres) ; leur valeur s'affiche au survol de la courbe |
 | Filtrer | Choix de la caractéristique, légende cliquable, frise de sélection de la période, filtre de genre commun |
 | Détails à la demande | Infobulle sur chaque point, clic pour lister les titres les plus populaires de ce genre et de cette décennie |
 
@@ -45,15 +47,16 @@ La liste « Caractéristique » propose les 7 caractéristiques audio, le tempo,
 Le dataset contient très peu de titres anciens (3 titres dans les années 1950, contre 19 834 dans les années 2010). Pour ne pas tromper l'utilisateur :
 - la **taille de chaque point** est proportionnelle au nombre de titres ;
 - un point **vide** et une ligne en **pointillés** signalent une moyenne calculée sur moins de 30 titres, donc peu fiable ;
-- la **frise** sous le graphique montre le nombre de titres par décennie.
+- la **frise** sous le graphique montre le nombre de titres par décennie ;
+- l'**infobulle** d'un point donne la valeur, le nombre de titres et la mention « peu fiable » sous 30 titres.
 
 ### 4.3 Comparer et repérer les extrêmes
 
-Survoler une courbe la met en avant, estompe les autres, et affiche son maximum et son minimum.
+Chaque courbe porte un triangle ▲ sur son maximum et ▼ sur son minimum. Survoler une courbe la met en avant, estompe les autres et affiche la valeur de ces deux extrêmes.
 
 ![Survol de la courbe du rock](../img/courbes-2-survol.png)
 
-*Scénario (journaliste) :* « Le rock est-il devenu moins acoustique ? » Avec la caractéristique « Acousticness », la courbe du rock descend régulièrement : 0,31 dans les années 1960, 0,15 dans les années 1980, 0,10 dans les années 2010. En passant à « Energy », elle monte de 0,61 à 0,78 sur la même période. Les pointillés des années 1950 rappellent qu'on ne peut rien conclure avant 1960 (2 titres de rock seulement).
+*Scénario (journaliste) :* « Le rock est-il devenu moins acoustique ? » Avec la caractéristique « Acousticness », la courbe du rock descend régulièrement : 0,31 dans les années 1960, 0,15 dans les années 1980, 0,105 dans les années 2010, et le minimum ▼ tombe dans les années 2020 (0,027, sur 41 titres). En passant à « Energy », elle monte de 0,61 à 0,78 entre les années 1960 et 2010. Les pointillés des années 1950 rappellent qu'on ne peut rien conclure avant 1960 (2 titres de rock seulement).
 
 ### 4.4 Choisir une période
 
@@ -63,7 +66,7 @@ Glisser sur la frise sélectionne une période (arrondie aux décennies, deux au
 
 Cliquer sur un point affiche, sous le graphique, les 5 titres les plus populaires de ce genre et de cette décennie, et leur nombre total.
 
-*Scénario (mélomane) :* cliquer sur le point du rock des années 1970 donne les titres les plus populaires de cette décennie, et montre sur quels titres repose la moyenne affichée.
+*Scénario (mélomane) :* « Le R&B des années 1990 était-il plus joyeux qu'aujourd'hui ? » Avec « Valence », la courbe du R&B passe de 0,625 dans les années 1990 à 0,479 dans les années 2010 ; avec « Danceability », de 0,703 à 0,653. L'intuition est confirmée, et les deux moyennes reposent sur 695 et 2 580 titres. Un clic sur le point du R&B des années 1990 montre les titres les plus populaires de cette décennie, c'est-à-dire sur quels titres repose la moyenne affichée.
 
 ### 4.6 Masquer des genres et coordination
 
@@ -74,6 +77,7 @@ Cliquer sur un genre dans la légende le masque ou le réaffiche. Le filtre de g
 - **Couleurs** de genre communes au projet, et nom du genre écrit au bout de chaque courbe (les étiquettes trop proches sont écartées) pour ne pas obliger à aller et venir vers la légende.
 - **Échelle Y fixe** quand on masque des genres, pour que les comparaisons restent valables.
 - **Honnêteté sur les données** : taille des points, pointillés et frise rendent visible la faible quantité de titres anciens.
+- **Thème clair et sombre** commun au projet : les couleurs de l'interface viennent de variables CSS, les couleurs des genres restent les mêmes.
 
 ## 6. Fonctions principales
 

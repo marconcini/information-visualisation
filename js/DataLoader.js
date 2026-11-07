@@ -6,7 +6,7 @@
 
    Chaque membre appelle la méthode qui le concerne :
      DataLoader.correlation()     -> Maud   (heatmap)
-     DataLoader.hierarchy()       -> Arij   (treemap / sunburst)
+     DataLoader.hierarchy()       -> Arij   (treemap)
      DataLoader.trends()          -> Amir   (courbes multiples)
      DataLoader.tracksFeatures()  -> Adrien (coordonnées parallèles)
      DataLoader.tracksClean()     -> détails d'un titre (toutes les vues)
